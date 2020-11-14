@@ -7,7 +7,6 @@ import (
 	"os"
 	"regexp"
 	"strings"
-	"unicode"
 
 	cli "github.com/urfave/cli/v2"
 )
@@ -24,7 +23,7 @@ type Output struct {
 	Raw            string
 	VarCount       int
 	CustomVarCount int
-	Vars           []string
+	Tokens         TokenStream
 }
 
 type Opts struct {
@@ -143,35 +142,19 @@ func validateOutput(c *cli.Context) (*Output, error) {
 		return nil, errors.New("Output formatter must be a valid string and cannot be empty")
 	}
 
-	vars := make([]string, 0)
-	token := ""
-	isToken := false
-	for _, chr := range rawOutput {
-		// start of a var name
-		if chr == '$' {
-			isToken = true
-			if token != "" {
-				vars = append(vars, "$"+token)
-				token = ""
-			}
-			continue
-		}
-		if !unicode.IsLetter(chr) && !unicode.IsDigit(chr) && isToken {
-			vars = append(vars, "$"+token)
-			token = ""
-			isToken = false
-			continue
-		}
-		if isToken {
-			token += string(chr)
-		}
+	tokens, err := ParseOutput(rawOutput)
+	if err != nil {
+		return nil, err
 	}
 
 	varCount := 0
 	customVarCount := 0
-	for _, v := range vars {
+	for _, t := range tokens {
+		if t.Type != TokenTypeProperty {
+			continue
+		}
 		varCount++
-		if _, ok := ReservedVarNames[v]; !ok {
+		if _, ok := ReservedVarNames[t.Value]; !ok {
 			customVarCount++
 		}
 	}
@@ -180,6 +163,6 @@ func validateOutput(c *cli.Context) (*Output, error) {
 		Raw:            rawOutput,
 		VarCount:       varCount,
 		CustomVarCount: customVarCount,
-		Vars:           vars,
+		Tokens:         tokens,
 	}, nil
 }
