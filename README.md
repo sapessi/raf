@@ -33,3 +33,4 @@ $ raf -p var=/selector regex/ -p var2=/selector regex/ -o "output" <files select
 - [ ] Sort parameters
 - [ ] tests tests tests
 - [ ] Quiet mode options
+- [ ] Variable formatting
