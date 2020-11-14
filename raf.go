@@ -22,7 +22,7 @@ func RenameAllFile(p []Prop, out *Output, files []string, opts Opts) error {
 			if len(matches) > 1 {
 				logOut(fmt.Sprintf("WARNING: the matcher %s matches multiple parts on file %s, only the leftmost is available", prop.Matcher, fileName), opts)
 			}
-			varValues[prop.Name] = matches[0]
+			varValues["$"+prop.Name] = matches[0]
 		}
 
 		outName := out.Raw
