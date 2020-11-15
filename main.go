@@ -9,8 +9,6 @@ import (
 	cli "github.com/urfave/cli/v2"
 )
 
-var ReservedVarNames = map[string]int8{"$cnt": 0}
-
 type Output struct {
 	Raw            string
 	VarCount       int

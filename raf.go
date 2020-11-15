@@ -4,16 +4,27 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 )
+
+type renamerState struct {
+	idx       int
+	fileName  string
+	extension string
+}
 
 func RenameAllFiles(p []Prop, out *Output, files []string, opts Opts) error {
 	for idx, f := range files {
-		cnt := idx + 1
 		fileName := filepath.Base(f)
+		state := renamerState{
+			idx:       idx,
+			fileName:  fileName,
+			extension: filepath.Ext(fileName),
+		}
 
 		varValues := extractVarValues(fileName, p, opts)
-		varValues["$cnt"] = strconv.Itoa(cnt)
+		for k, v := range ReservedVarNames {
+			varValues[k] = v(state)
+		}
 
 		outName, err := renameString(fileName, varValues, out, opts)
 		if err != nil {
