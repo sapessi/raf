@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 )
 
+type VarValues = map[string]string
+
 type renamerState struct {
 	idx       int
 	fileName  string
@@ -14,6 +16,13 @@ type renamerState struct {
 
 func RenameAllFiles(p []Prop, out *Output, files []string, opts Opts) error {
 	for idx, f := range files {
+		absPath, err := filepath.Abs(f)
+		if err != nil {
+			logOut(fmt.Sprintf("Could not determine absolute path for %s: %s", f, err), opts)
+			return err
+		}
+		baseDir := filepath.Dir(absPath)
+
 		fileName := filepath.Base(f)
 		state := renamerState{
 			idx:       idx,
@@ -26,7 +35,7 @@ func RenameAllFiles(p []Prop, out *Output, files []string, opts Opts) error {
 			varValues[k] = v(state)
 		}
 
-		outName, err := renameString(fileName, varValues, out, opts)
+		outName, err := RenameString(fileName, varValues, out, opts)
 		if err != nil {
 			return err
 		}
@@ -34,7 +43,7 @@ func RenameAllFiles(p []Prop, out *Output, files []string, opts Opts) error {
 		logOut(fmt.Sprintf("Renaming \"%s\" to \"%s\"", fileName, outName), opts)
 
 		if !opts.DryRun {
-			err := os.Rename(fileName, outName)
+			err := os.Rename(baseDir+string(os.PathSeparator)+fileName, baseDir+string(os.PathSeparator)+outName)
 			if err != nil {
 				return fmt.Errorf("Error while renaming %s to %s: %v", fileName, outName, err)
 			}
@@ -45,7 +54,7 @@ func RenameAllFiles(p []Prop, out *Output, files []string, opts Opts) error {
 	return nil
 }
 
-func renameString(from string, varValues map[string]string, out *Output, opts Opts) (string, error) {
+func RenameString(from string, varValues VarValues, out *Output, opts Opts) (string, error) {
 	outName := ""
 	for _, t := range out.Tokens {
 		if t.Type == TokenTypeLiteral {
@@ -73,7 +82,7 @@ func renameString(from string, varValues map[string]string, out *Output, opts Op
 	return outName, nil
 }
 
-func extractVarValues(fname string, p []Prop, opts Opts) map[string]string {
+func extractVarValues(fname string, p []Prop, opts Opts) VarValues {
 	varValues := make(map[string]string)
 	for _, prop := range p {
 		matches := prop.Regex.FindAllStringSubmatch(fname, -1) //prop.Regex.FindAllString(fname, -1)
