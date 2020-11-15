@@ -5,19 +5,11 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"regexp"
-	"strings"
 
 	cli "github.com/urfave/cli/v2"
 )
 
 var ReservedVarNames = map[string]int8{"$cnt": 0}
-
-type Prop struct {
-	Name    string
-	Matcher string
-	Regex   *regexp.Regexp
-}
 
 type Output struct {
 	Raw            string
@@ -93,7 +85,7 @@ func rename(c *cli.Context) error {
 		DryRun:  c.Bool("dryrun"),
 		Verbose: c.Bool("verbose"),
 	}
-	err = RenameAllFile(props, out, matches, opts)
+	err = RenameAllFiles(props, out, matches, opts)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -115,22 +107,11 @@ func validateProps(c *cli.Context) ([]Prop, error) {
 	props := make([]Prop, len(args))
 
 	for idx, v := range args {
-		kv := strings.Split(v, "=")
-		if len(kv) != 2 {
-			return nil, fmt.Errorf("Invalid property definition %s. Property definitions must contain a name and a matcher: name=/matcher/", v)
-		}
-		if _, ok := ReservedVarNames[kv[0]]; ok {
-			return nil, fmt.Errorf("The property name %s is reserved", kv[0])
-		}
-		regex, err := regexp.Compile(kv[1])
+		prop, err := ParseProp(v)
 		if err != nil {
-			return nil, fmt.Errorf("Invalid matcher for pattern %d: %s. Selector must be valid regular expressions.", idx, kv[1])
+			return nil, err
 		}
-		props[idx] = Prop{
-			Name:    kv[0],
-			Matcher: kv[1],
-			Regex:   regex,
-		}
+		props[idx] = prop
 	}
 
 	return props, nil
