@@ -19,7 +19,7 @@ func RenameAllFiles(p []Prop, tokens TokenStream, files []string, opts Opts) err
 	for idx, f := range files {
 		absPath, err := filepath.Abs(f)
 		if err != nil {
-			logOut(fmt.Sprintf("Could not determine absolute path for %s: %s", f, err), opts)
+			fmt.Fprintf(os.Stderr, "Could not determine absolute path for %s: %s", f, err)
 			return err
 		}
 		baseDir := filepath.Dir(absPath)
@@ -41,7 +41,9 @@ func RenameAllFiles(p []Prop, tokens TokenStream, files []string, opts Opts) err
 			return err
 		}
 
-		logOut(fmt.Sprintf("Renaming \"%s\" to \"%s\"", fileName, outName), opts)
+		if opts.Verbose {
+			fmt.Fprintf(os.Stderr, "Renaming \"%s\" to \"%s\"", fileName, outName)
+		}
 
 		if !opts.DryRun {
 			outPath := baseDir + string(os.PathSeparator) + outName
@@ -71,12 +73,12 @@ func GenerateName(varValues VarValues, out TokenStream, opts Opts) (string, erro
 
 			propValue, ok := varValues[t.Value]
 			if !ok {
-				logOut(fmt.Sprintf("WARNING: Output asks for value %s that is not declared as a property", t.Value), opts)
+				fmt.Fprintf(os.Stderr, "WARNING: Output asks for value %s that is not declared as a property", t.Value)
 				continue
 			}
 
-			if propValue == "" {
-				logOut(fmt.Sprintf("WARNING: Value for property %s is empty", t.Value), opts)
+			if propValue == "" && opts.Verbose {
+				fmt.Fprintf(os.Stderr, "WARNING: Value for property %s is empty", t.Value)
 			}
 			formattedValue, err := formatValue(propValue, t.Formatter)
 			if err != nil {
@@ -99,12 +101,14 @@ func extractVarValues(fname string, p []Prop, opts Opts) VarValues {
 	for _, prop := range p {
 		matches := prop.Regex.FindAllStringSubmatch(fname, -1) //prop.Regex.FindAllString(fname, -1)
 		if matches == nil {
-			logOut(fmt.Sprintf("WARNING: the matcher %s does not match any string on file %s", prop.Matcher, fname), opts)
+			if opts.Verbose {
+				fmt.Fprintf(os.Stderr, "WARNING: the matcher %s does not match any string on file %s", prop.Matcher, fname)
+			}
 			varValues["$"+prop.Name] = ""
 			continue
 		}
-		if len(matches) > 1 {
-			logOut(fmt.Sprintf("WARNING: the matcher %s matches multiple parts on file %s, only the leftmost is available", prop.Matcher, fname), opts)
+		if len(matches) > 1 && opts.Verbose {
+			fmt.Fprintf(os.Stderr, "WARNING: the matcher %s matches multiple parts on file %s, only the leftmost is available", prop.Matcher, fname)
 		}
 		varValues["$"+prop.Name] = matches[0][len(matches[0])-1]
 	}
@@ -115,12 +119,4 @@ func extractVarValues(fname string, p []Prop, opts Opts) VarValues {
 // TODO: implement formatting
 func formatValue(val, formatter string) (string, error) {
 	return val, nil
-}
-
-func logOut(str string, opt Opts) {
-	if opt.DryRun {
-		fmt.Fprintln(os.Stderr, str)
-		return
-	}
-	fmt.Println(str)
 }
