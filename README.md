@@ -10,7 +10,7 @@ $ ls
 [Wedding]UnionStudio - Video 4 - Reception_(10bit_BD720p_x265).mkv
 [Wedding]UnionStudio - Video 5 - Day2_(10bit_BD720p_x265).mkv
 
-$ raf -p title=/\ \-\ Video\ \d+\\ \-\ ([A-Za-z0-9\ )_/ -o 'UnionStudio - $cnt - $title.mkv' *
+$ raf -p "title=Video\ \d+\ \-\ ([A-Za-z0-9\ ]+)_" -d -o 'UnionStudio - $cnt - $title.mkv' *
 ```
 **Remember to use single quotes for the output name so that the `$` won't be interpreted by the shell**
 
@@ -29,8 +29,17 @@ $ raf -p var=/selector regex/ -p var2=/selector regex/ -o "output" <files select
 * `$cnt`: Counter starting from 1 and incremented for each file
 
 ## TODO
-- [ ] Default variables `ext` and `fname`
+- [x] Default variables `ext` and `fname`
 - [ ] Sort parameters
 - [ ] tests tests tests
 - [ ] Quiet mode options
 - [ ] Variable formatting
+- [ ] Undo
+
+### Formatting
+- zero padded no: $cnt[000]
+- upper case: $title[^]
+- trim: $title[0:10]
+- camel case: $title[_^_]
+- pascal case: $title[^_^]
+- replace: $title[/-/ /]
