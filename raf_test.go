@@ -40,3 +40,25 @@ func TestExtractPropNoMatch(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, "", title)
 }
+
+func TestRenameStringSimple(t *testing.T) {
+	values := make(map[string]string)
+	values["$title"] = "test title"
+	out, err := ParseOutput("rip - $title.mkv")
+	assert.Nil(t, err)
+
+	renamed, err := GenerateName(values, out, Opts{})
+	assert.Nil(t, err)
+	assert.Equal(t, "rip - test title.mkv", renamed)
+}
+
+func TestRenameStringMissingProperty(t *testing.T) {
+	values := make(map[string]string)
+	values["$title"] = "test title"
+	out, err := ParseOutput("rip - $title2.mkv")
+	assert.Nil(t, err)
+
+	renamed, err := GenerateName(values, out, Opts{})
+	assert.Nil(t, err)
+	assert.Equal(t, "rip - .mkv", renamed)
+}
