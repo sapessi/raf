@@ -35,7 +35,7 @@ func RenameAllFiles(p []Prop, out *Output, files []string, opts Opts) error {
 			varValues[k] = v(state)
 		}
 
-		outName, err := RenameString(fileName, varValues, out, opts)
+		outName, err := RenameString(varValues, out.Tokens, opts)
 		if err != nil {
 			return err
 		}
@@ -43,6 +43,10 @@ func RenameAllFiles(p []Prop, out *Output, files []string, opts Opts) error {
 		logOut(fmt.Sprintf("Renaming \"%s\" to \"%s\"", fileName, outName), opts)
 
 		if !opts.DryRun {
+			outPath := baseDir + string(os.PathSeparator) + outName
+			if _, err := os.Stat(outPath); err == nil {
+				return fmt.Errorf("The file %s already exists", outPath)
+			}
 			err := os.Rename(baseDir+string(os.PathSeparator)+fileName, baseDir+string(os.PathSeparator)+outName)
 			if err != nil {
 				return fmt.Errorf("Error while renaming %s to %s: %v", fileName, outName, err)
@@ -54,9 +58,9 @@ func RenameAllFiles(p []Prop, out *Output, files []string, opts Opts) error {
 	return nil
 }
 
-func RenameString(from string, varValues VarValues, out *Output, opts Opts) (string, error) {
+func RenameString(varValues VarValues, out TokenStream, opts Opts) (string, error) {
 	outName := ""
-	for _, t := range out.Tokens {
+	for _, t := range out {
 		if t.Type == TokenTypeLiteral {
 			outName += t.Value
 			continue
