@@ -24,28 +24,33 @@ type Opts struct {
 }
 
 func main() {
+	cli.VersionFlag = &cli.BoolFlag{
+		Name:    "version",
+		Aliases: []string{"V"},
+		Usage:   "print raf version",
+	}
 	app := &cli.App{
 		Name:        "raf",
-		Usage:       "Rename All Files",
-		Description: "Rename all selected files based on the set of rules passed as options",
+		Usage:       "raf -p \"title=Video\\ \\d+\\ \\-\\ ([A-Za-z0-9\\ ]+)_\" -d -o 'UnionStudio - $cnt - $title.mkv' *",
+		Description: cliDescription,
+		Version:     "v0.1",
 		Flags: []cli.Flag{
 			&cli.StringSliceFlag{
-				Name:        "prop",
-				Aliases:     []string{"p"},
-				Usage:       "Extract a portion of the file name and assign it to a varible",
-				DefaultText: "title=/\\ \\-([A-Za-z0-9\\ ]+)\\_/",
+				Name:    "prop",
+				Aliases: []string{"p"},
+				//Usage:   "-p \"title=Video\\ \\d+\\ \\-\\ ([A-Za-z0-9\\ ]+)_\"",
+				Usage: propFlagDescription,
 			},
 			&cli.StringFlag{
-				Name:        "output",
-				Aliases:     []string{"o"},
-				Usage:       "Define the output file name using string substitution",
-				DefaultText: "\"MyVidew - $cnt - $title\"",
-				Required:    true,
+				Name:     "output",
+				Aliases:  []string{"o"},
+				Usage:    outputFlagDescription,
+				Required: true,
 			},
 			&cli.BoolFlag{
 				Name:    "dryrun",
 				Aliases: []string{"d"},
-				Usage:   "Runs the command in dry run mode. When in dry run mode the log output is sent to stderr and the changed file names are sent to stdout, the files are not actually renamed",
+				Usage:   dryRunFlagDescription,
 			},
 			&cli.BoolFlag{
 				Name:    "verbose",
