@@ -6,15 +6,16 @@ import (
 	"path/filepath"
 )
 
+// VarValues stores the values parsed from the original name of the file based on the
+// Prop configured.
 type VarValues = map[string]string
 
-type renamerState struct {
-	idx       int
-	fileName  string
-	extension string
-}
-
-func RenameAllFiles(p []Prop, out *Output, files []string, opts Opts) error {
+// RenameAllFiles iterates over the files passed as input and for each one, extracts the
+// property values, populates the intrinsic properties, and calls the GenerateName function.
+//
+// If the DryRun property of the Opts object is set to true the files are not actually
+// renamed and the output, generated name is printed out
+func RenameAllFiles(p []Prop, tokens TokenStream, files []string, opts Opts) error {
 	for idx, f := range files {
 		absPath, err := filepath.Abs(f)
 		if err != nil {
@@ -35,7 +36,7 @@ func RenameAllFiles(p []Prop, out *Output, files []string, opts Opts) error {
 			varValues[k] = v(state)
 		}
 
-		outName, err := RenameString(varValues, out.Tokens, opts)
+		outName, err := GenerateName(varValues, tokens, opts)
 		if err != nil {
 			return err
 		}
@@ -58,7 +59,8 @@ func RenameAllFiles(p []Prop, out *Output, files []string, opts Opts) error {
 	return nil
 }
 
-func RenameString(varValues VarValues, out TokenStream, opts Opts) (string, error) {
+// GenerateName uses the variable values to generate a string based on the input TokenStream
+func GenerateName(varValues VarValues, out TokenStream, opts Opts) (string, error) {
 	outName := ""
 	for _, t := range out {
 		if t.Type == TokenTypeLiteral {
@@ -84,6 +86,12 @@ func RenameString(varValues VarValues, out TokenStream, opts Opts) (string, erro
 		}
 	}
 	return outName, nil
+}
+
+type renamerState struct {
+	idx       int
+	fileName  string
+	extension string
 }
 
 func extractVarValues(fname string, p []Prop, opts Opts) VarValues {

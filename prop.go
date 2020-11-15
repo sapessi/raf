@@ -6,12 +6,15 @@ import (
 	"strings"
 )
 
+// Prop defines a property that can be used in the RenameAllFiles to extract
+// values from the original file name.
 type Prop struct {
 	Name    string
 	Matcher string
 	Regex   *regexp.Regexp
 }
 
+// ParseProp populates a Prop object based on the string format passed to the cli: "propName=/regex/"
 func ParseProp(v string) (Prop, error) {
 	kv := strings.Split(v, "=")
 	if len(kv) != 2 {
@@ -23,6 +26,8 @@ func ParseProp(v string) (Prop, error) {
 	return NewProp(kv[0], kv[1])
 }
 
+// NewProp creates a new Prop object for the given name and matcher regex. The regex string is compiled
+// into a RegEx struct.
 func NewProp(name, matcher string) (Prop, error) {
 	regex, err := regexp.Compile(matcher)
 	if err != nil {

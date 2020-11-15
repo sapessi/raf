@@ -9,13 +9,15 @@ import (
 	cli "github.com/urfave/cli/v2"
 )
 
-type Output struct {
+type output struct {
 	Raw            string
 	VarCount       int
 	CustomVarCount int
 	Tokens         TokenStream
 }
 
+// Opts contains the global settings for the library and it is passed to nearly
+// all methods.
 type Opts struct {
 	DryRun  bool
 	Verbose bool
@@ -83,7 +85,7 @@ func rename(c *cli.Context) error {
 		DryRun:  c.Bool("dryrun"),
 		Verbose: c.Bool("verbose"),
 	}
-	err = RenameAllFiles(props, out, matches, opts)
+	err = RenameAllFiles(props, out.Tokens, matches, opts)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -115,7 +117,7 @@ func validateProps(c *cli.Context) ([]Prop, error) {
 	return props, nil
 }
 
-func validateOutput(c *cli.Context) (*Output, error) {
+func validateOutput(c *cli.Context) (*output, error) {
 	rawOutput := c.String("output")
 	if rawOutput == "" {
 		return nil, errors.New("Output formatter must be a valid string and cannot be empty")
@@ -138,7 +140,7 @@ func validateOutput(c *cli.Context) (*Output, error) {
 		}
 	}
 
-	return &Output{
+	return &output{
 		Raw:            rawOutput,
 		VarCount:       varCount,
 		CustomVarCount: customVarCount,

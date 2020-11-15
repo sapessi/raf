@@ -3,7 +3,9 @@ package main
 import "unicode"
 
 const (
-	TokenTypeLiteral  = "literal"
+	// TokenTypeLiteral is used for literal strings in the output
+	TokenTypeLiteral = "literal"
+	// TokenTypeProperty is used for variables to be replaced in the output
 	TokenTypeProperty = "property"
 )
 
