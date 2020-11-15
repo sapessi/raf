@@ -123,7 +123,12 @@ func (p *statefulParser) parseProperty() (Token, error) {
 func (p *statefulParser) parseLiteral() (Token, error) {
 	str := ""
 	for !p.isLast() && p.peek() != '$' {
-		str += string(p.nextChr())
+		nextChr := p.nextChr()
+		// remove escapes
+		if nextChr == '\\' {
+			nextChr = p.nextChr()
+		}
+		str += string(nextChr)
 	}
 
 	return Token{
