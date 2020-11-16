@@ -115,3 +115,12 @@ func TestLiteralSquareBracketsPublicParse(t *testing.T) {
 	assert.Equal(t, "$ext", tokens[3].Value)
 	assert.Equal(t, TokenTypeProperty, tokens[3].Type)
 }
+
+func TestUTF8CharsLiteral(t *testing.T) {
+	tokens, err := ParseOutput("Title ½ - $cnt")
+	assert.Nil(t, err)
+
+	assert.Equal(t, 2, len(tokens))
+	assert.Equal(t, TokenTypeLiteral, tokens[0].Type)
+	assert.Equal(t, "Title ½ - ", tokens[0].Value)
+}

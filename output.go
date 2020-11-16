@@ -40,15 +40,16 @@ func ParseOutput(out string) (TokenStream, error) {
 type statefulParser struct {
 	idx      int
 	len      int
-	str      string
+	str      []rune
 	curValue string
 }
 
 func newParser(out string) statefulParser {
+	runeSlice := []rune(out)
 	return statefulParser{
 		idx: 0,
-		str: out,
-		len: len(out),
+		str: runeSlice,
+		len: len(runeSlice),
 	}
 }
 
