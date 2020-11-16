@@ -10,17 +10,32 @@ import (
 // Prop configured.
 type VarValues = map[string]string
 
+// RenameLogEntry records an operation performed in a file and can be used to undo
+// the rename
+type RenameLogEntry struct {
+	OriginalFileName string
+	// OriginalFileChecksum is not used at the moment, we may enable it through a separate
+	// options since it could have a significant impact on performance
+	OriginalFileChecksum string
+	NewFileName          string
+}
+
+// RenameLog is a slice of RenameLogEntry objects that record all of the opertaions
+// performed by the RenameAllFiles function
+type RenameLog = []RenameLogEntry
+
 // RenameAllFiles iterates over the files passed as input and for each one, extracts the
 // property values, populates the intrinsic properties, and calls the GenerateName function.
 //
 // If the DryRun property of the Opts object is set to true the files are not actually
 // renamed and the output, generated name is printed out
-func RenameAllFiles(p []Prop, tokens TokenStream, files []string, opts Opts) error {
+func RenameAllFiles(p []Prop, tokens TokenStream, files []string, opts Opts) (RenameLog, error) {
+	rlog := make([]RenameLogEntry, len(files))
 	for idx, f := range files {
 		absPath, err := filepath.Abs(f)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Could not determine absolute path for %s: %s\n", f, err)
-			return err
+			return rlog[:idx], err
 		}
 		baseDir := filepath.Dir(absPath)
 
@@ -38,7 +53,7 @@ func RenameAllFiles(p []Prop, tokens TokenStream, files []string, opts Opts) err
 
 		outName, err := GenerateName(varValues, tokens, opts)
 		if err != nil {
-			return err
+			return rlog[:idx], err
 		}
 
 		if opts.Verbose {
@@ -48,18 +63,22 @@ func RenameAllFiles(p []Prop, tokens TokenStream, files []string, opts Opts) err
 		if !opts.DryRun {
 			outPath := baseDir + string(os.PathSeparator) + outName
 			if _, err := os.Stat(outPath); err == nil {
-				return fmt.Errorf("The file %s already exists", outPath)
+				return rlog[:idx], fmt.Errorf("The file %s already exists", outPath)
 			}
 			err := os.Rename(baseDir+string(os.PathSeparator)+fileName, baseDir+string(os.PathSeparator)+outName)
 			if err != nil {
-				return fmt.Errorf("Error while renaming %s to %s: %v", fileName, outName, err)
+				return rlog[:idx], fmt.Errorf("Error while renaming %s to %s: %v", fileName, outName, err)
+			}
+			rlog[idx] = RenameLogEntry{
+				OriginalFileName: fileName,
+				NewFileName:      outName,
 			}
 			fmt.Println(outName)
 		} else {
 			fmt.Printf("File %s -> %s\n", fileName, outName)
 		}
 	}
-	return nil
+	return rlog, nil
 }
 
 // GenerateName uses the variable values to generate a string based on the input TokenStream

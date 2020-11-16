@@ -1,13 +1,17 @@
 package main
 
 import (
+	"encoding/gob"
 	"errors"
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 
 	cli "github.com/urfave/cli/v2"
 )
+
+const rafStatusFile = ".raf"
 
 type output struct {
 	Raw            string
@@ -90,10 +94,17 @@ func rename(c *cli.Context) error {
 		DryRun:  c.Bool("dryrun"),
 		Verbose: c.Bool("verbose"),
 	}
-	err = RenameAllFiles(props, out.Tokens, matches, opts)
+	rlog, err := RenameAllFiles(props, out.Tokens, matches, opts)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
+	}
+	if !opts.DryRun {
+		err = writeRenameLog(rlog, c)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Could not write rename log %v\n", err)
+			os.Exit(1)
+		}
 	}
 	return nil
 }
@@ -151,4 +162,36 @@ func validateOutput(c *cli.Context) (*output, error) {
 		CustomVarCount: customVarCount,
 		Tokens:         tokens,
 	}, nil
+}
+
+func writeRenameLog(rlog RenameLog, c *cli.Context) error {
+	// get folder
+	absPath, err := filepath.Abs(c.Args().First())
+	if err != nil {
+		return err
+	}
+	statusFile := filepath.Dir(absPath) + string(os.PathSeparator) + rafStatusFile
+
+	_, err = os.Stat(statusFile)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+	} else {
+		err = os.Remove(statusFile)
+		if err != nil {
+			return err
+		}
+
+	}
+	statusFileWriter, err := os.Create(statusFile)
+	if err != nil {
+		return err
+	}
+	gobEncoder := gob.NewEncoder(statusFileWriter)
+	err = gobEncoder.Encode(rlog)
+	if err != nil {
+		return err
+	}
+	return nil
 }
