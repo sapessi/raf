@@ -1,45 +1,28 @@
-# Rename All Files (raf)
+# Rename All Files (raf) 
 
-This command line utility renames multiple files based on a set of rules. The rules allow you to select portions of the original file name using regular expression and then compose them in a new name. 
+`raf` makes it easy to rename multiple files all at once. The name for the new files is constructed from parts of the original file name and can include additional string literals or intrinsic variables such as counters. Renaming multiple files in a folder is a delicate operation so `raf` allows both execution in dry-run mode (`-d`) that simply prints out the changes it would make and rollback by creating a `.raf` file in the folder that contains the orioginl file names.
 
-```bash
-$ ls 
-[Wedding]UnionStudio - Video 1 - Home_(10bit_BD720p_x265).mkv
-[Wedding]UnionStudio - Video 2 - Venue_(10bit_BD720p_x265).mkv
-[Wedding]UnionStudio - Video 3 - Church_(10bit_BD720p_x265).mkv
-[Wedding]UnionStudio - Video 4 - Reception_(10bit_BD720p_x265).mkv
-[Wedding]UnionStudio - Video 5 - Day2_(10bit_BD720p_x265).mkv
+![](media/raf.gif)
 
-$ raf -p "title=Video\ \d+\ \-\ ([A-Za-z0-9\ ]+)_" -d -o 'UnionStudio - $cnt - $title.mkv' *
-```
-**Remember to use single quotes for the output name so that the `$` won't be interpreted by the shell**
-
-## Syntax
-```bash
-$ raf -p var=/selector regex/ -p var2=/selector regex/ -o "output" <files selector>
-```
 
 ## Options:
-* `--prop -p`: Specifies a regular expression to select a part of the file name and saves its value in the variable name. `<title>=/regex/`
+* `--prop -p`: Specifies a regular expression to select a part of the file name and saves its value in the variable name. `<name>=<regex>`
 * `--output -o`: Specifies the format of the output using the variables selected through the `-p` options as well as the default/generated variables
 * `--dryrun -d`: Runs the command in dry run mode. When in dry run mode the log output is sent to stderr and the changed file names are sent to stdout, the files are not actually renamed
 * `--verbose -v`: Prints verbose log output
 
-## Default variables
+## Intrinsic variables
+These variables are automatically made available during execution and can be referenced in the output text
 * `$cnt`: Counter starting from 1 and incremented for each file
+* `$ext`: Extension of the original file
+* `$fname`: Full original file name
+
+## Undo
+`raf` saves a `.raf` status file in the folder where it was executed. If you run the `raf undo` command `raf` reads the status file and restore the files to their original name.
+
+## stdout, stderr
+`raf` sends all log output to stderr. The stdout only receives the new file names separate by `\n`. This makes it easy to use it in combination with other commands. When executed in dry-run mode the `stdout` is: `File <original file name> -> <new file name>`
 
 ## TODO
-- [x] Default variables `ext` and `fname`
-- [ ] Sort parameters
 - [ ] tests tests tests
-- [ ] Quiet mode options
-- [ ] Variable formatting
-- [ ] Undo
-
-### Formatting
-- zero padded no: $cnt[000]
-- upper case: $title[^]
-- trim: $title[0:10]
-- camel case: $title[_^_]
-- pascal case: $title[^_^]
-- replace: $title[/-/ /]
+- [ ] Output formatting, for example $cnt[%03d] to obtain `001`
