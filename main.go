@@ -46,10 +46,9 @@ func main() {
 				Usage: propFlagDescription,
 			},
 			&cli.StringFlag{
-				Name:     "output",
-				Aliases:  []string{"o"},
-				Usage:    outputFlagDescription,
-				Required: true,
+				Name:    "output",
+				Aliases: []string{"o"},
+				Usage:   outputFlagDescription,
 			},
 			&cli.BoolFlag{
 				Name:    "dryrun",
@@ -63,11 +62,79 @@ func main() {
 			},
 		},
 		Action: rename,
+		Commands: []*cli.Command{
+			{
+				Name:   "undo",
+				Usage:  undoCommandDescription,
+				Action: undo,
+			},
+		},
 	}
 	err := app.Run(os.Args)
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func undo(c *cli.Context) error {
+	opts := readOpts(c)
+	cwd := c.Args().First()
+	abs, err := filepath.Abs(cwd)
+	if err != nil {
+		return err
+	}
+	rafPath, err := os.Stat(abs)
+	if err != nil {
+		return err
+	}
+	if !rafPath.IsDir() {
+		return fmt.Errorf("%s is not a valid directory. The undo command receives the path to a directory containing a %s file", rafPath, rafStatusFile)
+	}
+	rafFilePath := abs + string(os.PathSeparator) + rafStatusFile
+	if _, err = os.Stat(rafFilePath); os.IsNotExist(err) {
+		return fmt.Errorf("The directory %s does not contain a valid raf status file (%s)", abs, rafStatusFile)
+	}
+	rlog, err := readRenameLog(rafFilePath)
+	if err != nil {
+		return err
+	}
+	if len(rlog) == 0 {
+		return fmt.Errorf("The raf status file %s does not contain any log entries", rafFilePath)
+	}
+	if opts.Verbose {
+		fmt.Fprintf(os.Stderr, "Beginning raf undo in folder %s", abs)
+	}
+
+	for _, entry := range rlog {
+		curFilePath := abs + string(os.PathSeparator) + entry.NewFileName
+		newFilePath := abs + string(os.PathSeparator) + entry.OriginalFileName
+		// new file must exists
+		if _, err = os.Stat(curFilePath); os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "WARNING: File %s from raf log not found", entry.NewFileName)
+			continue
+		}
+		// original file must not
+		if _, err = os.Stat(newFilePath); !os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "WARNING: Another file is already using the name %s preventing raf from resting %s to its original name", entry.OriginalFileName, entry.NewFileName)
+			continue
+		}
+
+		if !opts.DryRun {
+			err = os.Rename(curFilePath, newFilePath)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "ERROR: Could not rename file %s to %s: %v", curFilePath, newFilePath, err)
+			}
+			fmt.Println(entry.OriginalFileName)
+		} else {
+			fmt.Printf("File %s -> %s\n", entry.NewFileName, entry.OriginalFileName)
+		}
+	}
+
+	err = os.Remove(rafFilePath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "WARNING: Could not remove raf status file %s. This is not a critical issue since the file will be overwritten automatically if raf is executed again in this folder", rafFilePath)
+	}
+	return nil
 }
 
 func rename(c *cli.Context) error {
@@ -90,10 +157,7 @@ func rename(c *cli.Context) error {
 		fmt.Printf("The command declared %d properties but uses %d in the output formatter\n", len(props), out.CustomVarCount)
 		os.Exit(1)
 	}
-	opts := Opts{
-		DryRun:  c.Bool("dryrun"),
-		Verbose: c.Bool("verbose"),
-	}
+	opts := readOpts(c)
 	rlog, err := RenameAllFiles(props, out.Tokens, matches, opts)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -107,6 +171,13 @@ func rename(c *cli.Context) error {
 		}
 	}
 	return nil
+}
+
+func readOpts(c *cli.Context) Opts {
+	return Opts{
+		DryRun:  c.Bool("dryrun"),
+		Verbose: c.Bool("verbose"),
+	}
 }
 
 func validateMatcher(c *cli.Context) ([]string, error) {
@@ -194,4 +265,20 @@ func writeRenameLog(rlog RenameLog, c *cli.Context) error {
 		return err
 	}
 	return nil
+}
+
+func readRenameLog(path string) (RenameLog, error) {
+	reader, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+
+	decoder := gob.NewDecoder(reader)
+	var rlog RenameLog
+	err = decoder.Decode(&rlog)
+	if err != nil {
+		return nil, err
+	}
+	return rlog, nil
 }

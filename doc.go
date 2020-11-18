@@ -18,3 +18,5 @@ const outputFlagDescription = "The output flag specifies the pattern to generate
 
 const dryRunFlagDescription = "Dry run mode makes raf print to stderr the operations it would perform in the format \"File <original name> " +
 	"-> <new file name>\" without actually renaming the file."
+
+const undoCommandDescription = "The undo command looks for an .raf file in the working directory and reverts the file names to their original state"
