@@ -259,6 +259,7 @@ func writeRenameLog(rlog RenameLog, c *cli.Context) error {
 	if err != nil {
 		return err
 	}
+	defer statusFileWriter.Close()
 	gobEncoder := gob.NewEncoder(statusFileWriter)
 	err = gobEncoder.Encode(rlog)
 	if err != nil {
