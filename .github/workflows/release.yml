@@ -22,7 +22,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
     - name: Test
-      run: go test -coverprofile ./...
+      run: go test -coverprofile main
   build:
     name: Create Release
     runs-on: ubuntu-latest
