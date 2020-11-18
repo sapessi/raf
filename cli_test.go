@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -16,14 +15,16 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	make := exec.Command("go", "build", "-o", "./raf")
-	out, err := make.CombinedOutput()
-	if err != nil {
-		fmt.Printf("could not make binary for raf: %v\n%s", err, string(out))
-		os.Exit(1)
-	}
+	rc := m.Run()
 
-	os.Exit(m.Run())
+	if rc == 0 && testing.CoverMode() != "" {
+		c := testing.Coverage()
+		if c < 0.7 {
+			fmt.Println("Tests passed but coverage failed at", c)
+			rc = -1
+		}
+	}
+	os.Exit(rc)
 }
 
 func TestSimple(t *testing.T) {
@@ -43,6 +44,33 @@ func TestSimple(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, 5, len(files))
 	assert.Equal(t, "test - 2 - Chapel.avi", files[1])
+}
+
+func TestUndo(t *testing.T) {
+	testCtx, err := createIntegTestContext(t)
+	assert.Nil(t, err)
+
+	err = testCtx.CreateFiles("[UnionVideos] Wedding - $cnt - $title.mkv", "Home", "Chapel", "Church", "Reception", "Party")
+	assert.Nil(t, err)
+
+	app := getApp()
+	args := []string{"raf", "--prop", "title=\\d\\ \\-\\ ([A-Za-z0-9]+)\\.mkv", "--output", "test - $cnt - $title.avi"}
+	args = append(args, testCtx.Files(true)...)
+	err = app.Run(args)
+	assert.Nil(t, err)
+
+	files, err := testCtx.ListFilesInWorkingDir(false, false)
+	assert.Nil(t, err)
+	assert.Equal(t, 5, len(files))
+	assert.Equal(t, "test - 2 - Chapel.avi", files[1])
+
+	args = []string{"raf", "undo", testCtx.filesDir}
+	err = app.Run(args)
+	assert.Nil(t, err)
+	files, err = testCtx.ListFilesInWorkingDir(false, false)
+	assert.Nil(t, err)
+	assert.Equal(t, 5, len(files))
+	assert.Equal(t, "[UnionVideos] Wedding - 2 - Chapel.mkv", files[1])
 }
 
 type integTestContext struct {
@@ -129,7 +157,7 @@ func (t *integTestContext) CreateFiles(pattern string, titles ...string) error {
 			if t.Type == TokenTypeProperty {
 				if f, ok := ReservedVarNames[t.Value]; ok {
 					rstate := renamerState{
-						idx:       idx + 1,
+						idx:       idx,
 						fileName:  "",
 						extension: "",
 					}
