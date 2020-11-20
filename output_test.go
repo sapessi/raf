@@ -8,8 +8,8 @@ import (
 
 const singleLiteralStr = "one literal string"
 const literalPlusParam = "literal-$second"
-const literalPlusParamWithFormatter = "literal_$cnt[000] - ext.mkv"
-const literalSquareBrackets = "fileName [divx] - episode $cnt[000].$ext"
+const literalPlusParamWithFormatter = "literal_$cnt[%03] - ext.mkv"
+const literalSquareBrackets = "fileName [divx] - episode $cnt[%03].$ext"
 const paramAndEscapedBracket = "t - $title\\[2020]"
 
 func TestZeroLen(t *testing.T) {
@@ -27,7 +27,7 @@ func TestSingleLiteral(t *testing.T) {
 	assert.NotNil(t, tokens)
 	assert.Equal(t, 1, len(tokens))
 	assert.Equal(t, singleLiteralStr, tokens[0].Value)
-	assert.Equal(t, "", tokens[0].Formatter)
+	assert.Nil(t, tokens[0].Formatter)
 	assert.Equal(t, TokenTypeLiteral, tokens[0].Type)
 }
 
@@ -38,13 +38,13 @@ func TestParamAndEscapeBracket(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, 3, len(tokens))
 	assert.Equal(t, "t - ", tokens[0].Value)
-	assert.Equal(t, "", tokens[0].Formatter)
+	assert.Nil(t, tokens[0].Formatter)
 	assert.Equal(t, TokenTypeLiteral, tokens[0].Type)
 	assert.Equal(t, "$title", tokens[1].Value)
 	assert.Equal(t, TokenTypeProperty, tokens[1].Type)
-	assert.Equal(t, "", tokens[1].Formatter)
+	assert.Nil(t, tokens[1].Formatter)
 	assert.Equal(t, "[2020]", tokens[2].Value)
-	assert.Equal(t, "", tokens[2].Formatter)
+	assert.Nil(t, tokens[2].Formatter)
 	assert.Equal(t, TokenTypeLiteral, tokens[2].Type)
 }
 
@@ -56,11 +56,11 @@ func TestLiteralAndParam(t *testing.T) {
 	assert.NotNil(t, tokens)
 	assert.Equal(t, 2, len(tokens))
 	assert.Equal(t, "literal-", tokens[0].Value)
-	assert.Equal(t, "", tokens[0].Formatter)
+	assert.Nil(t, tokens[0].Formatter)
 	assert.Equal(t, TokenTypeLiteral, tokens[0].Type)
 	assert.Equal(t, "$second", tokens[1].Value)
 	assert.Equal(t, TokenTypeProperty, tokens[1].Type)
-	assert.Equal(t, "", tokens[1].Formatter)
+	assert.Nil(t, tokens[1].Formatter)
 }
 
 func TestLiteralAndParamWithFormatter(t *testing.T) {
@@ -71,13 +71,12 @@ func TestLiteralAndParamWithFormatter(t *testing.T) {
 	assert.NotNil(t, tokens)
 	assert.Equal(t, 3, len(tokens))
 	assert.Equal(t, "literal_", tokens[0].Value)
-	assert.Equal(t, "", tokens[0].Formatter)
+	assert.Nil(t, tokens[0].Formatter)
 	assert.Equal(t, TokenTypeLiteral, tokens[0].Type)
 	assert.Equal(t, "$cnt", tokens[1].Value)
 	assert.Equal(t, TokenTypeProperty, tokens[1].Type)
-	assert.Equal(t, "[000]", tokens[1].Formatter)
 	assert.Equal(t, " - ext.mkv", tokens[2].Value)
-	assert.Equal(t, "", tokens[2].Formatter)
+	assert.Nil(t, tokens[2].Formatter)
 	assert.Equal(t, TokenTypeLiteral, tokens[2].Type)
 }
 
@@ -92,7 +91,6 @@ func TestLiteralSquareBrackets(t *testing.T) {
 	assert.Equal(t, TokenTypeLiteral, tokens[0].Type)
 	assert.Equal(t, "$cnt", tokens[1].Value)
 	assert.Equal(t, TokenTypeProperty, tokens[1].Type)
-	assert.Equal(t, "[000]", tokens[1].Formatter)
 	assert.Equal(t, ".", tokens[2].Value)
 	assert.Equal(t, TokenTypeLiteral, tokens[2].Type)
 	assert.Equal(t, "$ext", tokens[3].Value)
@@ -109,7 +107,6 @@ func TestLiteralSquareBracketsPublicParse(t *testing.T) {
 	assert.Equal(t, TokenTypeLiteral, tokens[0].Type)
 	assert.Equal(t, "$cnt", tokens[1].Value)
 	assert.Equal(t, TokenTypeProperty, tokens[1].Type)
-	assert.Equal(t, "[000]", tokens[1].Formatter)
 	assert.Equal(t, ".", tokens[2].Value)
 	assert.Equal(t, TokenTypeLiteral, tokens[2].Type)
 	assert.Equal(t, "$ext", tokens[3].Value)
@@ -123,4 +120,31 @@ func TestUTF8CharsLiteral(t *testing.T) {
 	assert.Equal(t, 2, len(tokens))
 	assert.Equal(t, TokenTypeLiteral, tokens[0].Type)
 	assert.Equal(t, "Title ½ - ", tokens[0].Value)
+}
+
+func TestPaddingFormatterInCnt(t *testing.T) {
+	parser := newParser(literalPlusParamWithFormatter)
+	tokens, err := parser.parse()
+
+	assert.Nil(t, err)
+	assert.NotNil(t, tokens)
+	assert.Equal(t, 3, len(tokens))
+	assert.Equal(t, "$cnt", tokens[1].Value)
+	assert.Equal(t, TokenTypeProperty, tokens[1].Type)
+
+	formatters := tokens[1].Formatter
+	assert.Equal(t, 1, len(formatters))
+	assert.IsType(t, &PaddingFormatter{}, formatters[0])
+	pformatter, ok := formatters[0].(*PaddingFormatter)
+	assert.True(t, ok)
+	assert.Equal(t, 3, pformatter.PadLength)
+	assert.Equal(t, '0', pformatter.PadCharacter)
+}
+
+func TestUnknownFormatter(t *testing.T) {
+	parser := newParser("$cnt[>10]")
+	_, err := parser.parse()
+
+	assert.NotNil(t, err)
+	assert.EqualError(t, err, "Unknown formatter type >")
 }

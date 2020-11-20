@@ -53,7 +53,7 @@ func RenameAllFiles(p []Prop, tokens TokenStream, files []string, opts Opts) (Re
 			varValues[k] = v(state)
 		}
 
-		outName, err := GenerateName(varValues, tokens, opts)
+		outName, err := GenerateName(varValues, tokens, state, opts)
 		if err != nil {
 			return rlog[:idx], err
 		}
@@ -84,7 +84,7 @@ func RenameAllFiles(p []Prop, tokens TokenStream, files []string, opts Opts) (Re
 }
 
 // GenerateName uses the variable values to generate a string based on the input TokenStream
-func GenerateName(varValues VarValues, out TokenStream, opts Opts) (string, error) {
+func GenerateName(varValues VarValues, out TokenStream, rstate renamerState, opts Opts) (string, error) {
 	outName := ""
 	for _, t := range out {
 		if t.Type == TokenTypeLiteral {
@@ -102,11 +102,20 @@ func GenerateName(varValues VarValues, out TokenStream, opts Opts) (string, erro
 			if propValue == "" && opts.Verbose {
 				fmt.Fprintf(os.Stderr, "WARNING: Value for property %s is empty\n", t.Value)
 			}
-			formattedValue, err := formatValue(propValue, t.Formatter)
-			if err != nil {
-				return "", err // we treat a formatting error as fatal
+
+			if t.Formatter != nil {
+				formattedValue := propValue
+				for _, f := range t.Formatter {
+					fout, err := f.Format(formattedValue, rstate)
+					if err != nil {
+						return "", err
+					}
+					formattedValue = fout
+				}
+				outName += formattedValue
+			} else {
+				outName += propValue
 			}
-			outName += formattedValue
 		}
 	}
 	return outName, nil
@@ -142,9 +151,4 @@ func extractVarValues(fname string, p []Prop, opts Opts) VarValues {
 	}
 
 	return varValues
-}
-
-// TODO: implement formatting
-func formatValue(val, formatter string) (string, error) {
-	return val, nil
 }

@@ -1,6 +1,10 @@
 package main
 
-import "unicode"
+import (
+	"fmt"
+	"strconv"
+	"unicode"
+)
 
 const (
 	// TokenTypeLiteral is used for literal strings in the output
@@ -24,8 +28,12 @@ type TokenType = string
 type Token struct {
 	Type      TokenType
 	Value     string
-	Formatter string
+	Formatter FormattingPipeline
 }
+
+// FormattingPipeline is a slice of formatters associated with a property. Formatters are executed in
+// order and operate on each others output
+type FormattingPipeline = []Formatter
 
 // ParseOutput takes a string declaration of the output format - for example "fileName [divx] - episode $cnt[000].$ext"
 // and parses it into a sequence of tokens. Tokens can be of type literal or property: Literals are string literals that
@@ -95,7 +103,6 @@ func (p *statefulParser) isLast() bool {
 }
 
 func (p *statefulParser) parseProperty() (Token, error) {
-	formatter := ""
 	prop := ""
 	for !p.isLast() {
 		prop += string(p.nextChr())
@@ -103,22 +110,68 @@ func (p *statefulParser) parseProperty() (Token, error) {
 			break
 		}
 	}
+
 	// next we have a formatter
 	if p.peek() == '[' {
-		for !p.isLast() {
-			formatter += string(p.nextChr())
-			if p.peek() == ']' {
-				formatter += string(p.nextChr())
-				break
-			}
+		formatters, err := p.parseFormatters()
+		if err != nil {
+			return Token{}, err
 		}
+		// advance to skip the closing ]
+		p.nextChr()
+
+		return Token{
+			Type:      TokenTypeProperty,
+			Value:     prop,
+			Formatter: formatters,
+		}, nil
 	}
-	// TODO: validate formatter
+
 	return Token{
 		Type:      TokenTypeProperty,
 		Value:     prop,
-		Formatter: formatter,
+		Formatter: nil,
 	}, nil
+}
+
+func (p *statefulParser) parseFormatters() (FormattingPipeline, error) {
+	// at this point we should be just before the [, skip to next char
+	p.nextChr()
+	formatters := make([]Formatter, 0)
+
+	// switch by formatter type
+	for !p.isLast() && p.peek() != ']' {
+		chr := p.peek()
+		switch chr {
+		case '%': // padding
+			padder, err := p.parsePaddingFormatter()
+			if err != nil {
+				return nil, err
+			}
+			formatters = append(formatters, &padder)
+		default:
+			return nil, fmt.Errorf("Unknown formatter type %s", string(chr))
+		}
+	}
+
+	return formatters, nil
+}
+
+func (p *statefulParser) parsePaddingFormatter() (PaddingFormatter, error) {
+	// at this point we should be peeking at the %
+	p.nextChr() // %
+
+	padChar := p.nextChr()
+
+	padLength := ""
+	for !p.isLast() && (p.peek() != ']' && p.peek() != '-') {
+		padLength += string(p.nextChr())
+	}
+	padLengthInt, err := strconv.Atoi(padLength)
+	if err != nil {
+		return PaddingFormatter{}, err
+	}
+	return NewPaddingFormatter(padChar, padLengthInt), nil
 }
 
 func (p *statefulParser) parseLiteral() (Token, error) {
@@ -135,6 +188,6 @@ func (p *statefulParser) parseLiteral() (Token, error) {
 	return Token{
 		Type:      TokenTypeLiteral,
 		Value:     str,
-		Formatter: "",
+		Formatter: nil,
 	}, nil
 }

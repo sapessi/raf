@@ -8,6 +8,14 @@ import (
 
 const titlePropRegexGroup = "\\ \\-\\ ([A-Za-z0-9\\ ]+)\\ \\-"
 
+func mockState(cnt int) renamerState {
+	return renamerState{
+		fileName:  "",
+		idx:       cnt,
+		extension: "",
+	}
+}
+
 func TestExtractPropGroup(t *testing.T) {
 	p, err := NewProp("title", titlePropRegexGroup)
 	assert.Nil(t, err)
@@ -47,7 +55,7 @@ func TestRenameStringSimple(t *testing.T) {
 	out, err := ParseOutput("rip - $title.mkv")
 	assert.Nil(t, err)
 
-	renamed, err := GenerateName(values, out, Opts{})
+	renamed, err := GenerateName(values, out, mockState(0), Opts{})
 	assert.Nil(t, err)
 	assert.Equal(t, "rip - test title.mkv", renamed)
 }
@@ -58,7 +66,19 @@ func TestRenameStringMissingProperty(t *testing.T) {
 	out, err := ParseOutput("rip - $title2.mkv")
 	assert.Nil(t, err)
 
-	renamed, err := GenerateName(values, out, Opts{})
+	renamed, err := GenerateName(values, out, mockState(0), Opts{})
 	assert.Nil(t, err)
 	assert.Equal(t, "rip - .mkv", renamed)
+}
+
+func TestRenamePaddingFormatter(t *testing.T) {
+	values := make(map[string]string)
+	values["$title"] = "test title"
+	values["$cnt"] = "1"
+	out, err := ParseOutput("rip - $cnt[%03] - $title.mkv")
+	assert.Nil(t, err)
+
+	renamed, err := GenerateName(values, out, mockState(0), Opts{})
+	assert.Nil(t, err)
+	assert.Equal(t, "rip - 001 - test title.mkv", renamed)
 }
