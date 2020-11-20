@@ -85,7 +85,7 @@ func undo(c *cli.Context) error {
 			}
 			fmt.Println(entry.OriginalFileName)
 		} else {
-			fmt.Printf("File %s -> %s\n", entry.NewFileName, entry.OriginalFileName)
+			dryRunPrint(entry.NewFileName, entry.OriginalFileName)
 		}
 	}
 
