@@ -20,6 +20,11 @@ These variables are automatically made available during execution and can be ref
 ## Undo
 `raf` saves a `.raf` status file in the folder where it was executed. If you run the `raf undo` command `raf` reads the status file and restore the files to their original name.
 
+## Output formatting
+Properties in the output support formatters. As of today, only a padding formatter is available. However, `raf`'s code is ready to support a pipeline of different formatters. The padding formatter makes it easy to pad properties with a character. For example, you can use the padding formatter to zero-pad a number in the output. This output string `raf -o 'test - $cnt[%03].mkv' *` will produce the following file name `test - 001.mkv`.
+
+The padding formatter is triggered with the `%` character and receives two parameters. First, a single character (`0` in our example) that should be used for padding. Second, a number that represents the length of the field (`3` in our example). If you we had specified `$cnt[%a5]` the output would have been `aaaa1`.
+
 ## stdout, stderr
 `raf` sends all log output to stderr. The stdout only receives the new file names separate by `\n`. This makes it easy to use it in combination with other commands. When executed in dry-run mode the `stdout` is: `File <original file name> -> <new file name>`
 
