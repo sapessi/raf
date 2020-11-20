@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/fatih/color"
 )
 
 // VarValues stores the values parsed from the original name of the file based on the
@@ -75,7 +77,9 @@ func RenameAllFiles(p []Prop, tokens TokenStream, files []string, opts Opts) (Re
 			}
 			fmt.Println(outName)
 		} else {
-			fmt.Printf("File %s -> %s\n", fileName, outName)
+			red := color.New(color.FgHiRed).SprintFunc()
+			green := color.New(color.FgGreen).SprintFunc()
+			fmt.Printf("File %s -> %s\n", red(fileName), green(outName))
 		}
 	}
 	return rlog, nil
