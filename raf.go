@@ -77,9 +77,7 @@ func RenameAllFiles(p []Prop, tokens TokenStream, files []string, opts Opts) (Re
 			}
 			fmt.Println(outName)
 		} else {
-			red := color.New(color.FgHiRed).SprintFunc()
-			green := color.New(color.FgGreen).SprintFunc()
-			fmt.Printf("File %s -> %s\n", red(fileName), green(outName))
+			dryRunPrint(fileName, outName)
 		}
 	}
 	return rlog, nil
@@ -112,6 +110,12 @@ func GenerateName(varValues VarValues, out TokenStream, opts Opts) (string, erro
 		}
 	}
 	return outName, nil
+}
+
+func dryRunPrint(from, to string) {
+	red := color.New(color.FgHiRed).SprintFunc()
+	green := color.New(color.FgGreen).SprintFunc()
+	fmt.Printf("File %s -> %s\n", red(from), green(to))
 }
 
 type renamerState struct {
