@@ -121,6 +121,66 @@ func GenerateName(varValues VarValues, out TokenStream, rstate renamerState, opt
 	return outName, nil
 }
 
+// Undo looks for a rename log file in the given folder and reverses the change to the files listed in the log
+func Undo(cwd string, opts Opts) error {
+	abs, err := filepath.Abs(cwd)
+	if err != nil {
+		return err
+	}
+	rafPath, err := os.Stat(abs)
+	if err != nil {
+		return err
+	}
+	if !rafPath.IsDir() {
+		return fmt.Errorf("%s is not a valid directory. The undo command receives the path to a directory containing a %s file", rafPath, rafStatusFile)
+	}
+	rafFilePath := abs + string(os.PathSeparator) + rafStatusFile
+	if _, err = os.Stat(rafFilePath); os.IsNotExist(err) {
+		return fmt.Errorf("The directory %s does not contain a valid raf status file (%s)", abs, rafStatusFile)
+	}
+	rlog, err := readRenameLog(rafFilePath)
+	if err != nil {
+		return err
+	}
+	if len(rlog) == 0 {
+		return fmt.Errorf("The raf status file %s does not contain any log entries", rafFilePath)
+	}
+	if opts.Verbose {
+		fmt.Fprintf(os.Stderr, "Beginning raf undo in folder %s", abs)
+	}
+
+	for _, entry := range rlog {
+		curFilePath := abs + string(os.PathSeparator) + entry.NewFileName
+		newFilePath := abs + string(os.PathSeparator) + entry.OriginalFileName
+		// new file must exists
+		if _, err = os.Stat(curFilePath); os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "WARNING: File %s from raf log not found", entry.NewFileName)
+			continue
+		}
+		// original file must not
+		if _, err = os.Stat(newFilePath); !os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "WARNING: Another file is already using the name %s preventing raf from resting %s to its original name", entry.OriginalFileName, entry.NewFileName)
+			continue
+		}
+
+		if !opts.DryRun {
+			err = os.Rename(curFilePath, newFilePath)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "ERROR: Could not rename file %s to %s: %v", curFilePath, newFilePath, err)
+			}
+			fmt.Println(entry.OriginalFileName)
+		} else {
+			dryRunPrint(entry.NewFileName, entry.OriginalFileName)
+		}
+	}
+
+	err = os.Remove(rafFilePath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "WARNING: Could not remove raf status file %s. This is not a critical issue since the file will be overwritten automatically if raf is executed again in this folder", rafFilePath)
+	}
+	return nil
+}
+
 func dryRunPrint(from, to string) {
 	red := color.New(color.FgHiRed).SprintFunc()
 	green := color.New(color.FgGreen).SprintFunc()
