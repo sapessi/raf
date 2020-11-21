@@ -12,6 +12,37 @@ import (
 // Prop configured.
 type VarValues = map[string]string
 
+const (
+	// RenameWarningTypePropertyValueEmpty is used when the renamer could not extract the
+	// value for the property from the original file name. The Value property of the
+	// RenameWarning will be populated with the name of the requested property.
+	RenameWarningTypePropertyValueEmpty = iota
+	// RenameWarningtypePropertyMissing is used when the property requested by the output
+	// name generator was not declared as a property to be extracted from the input file
+	// name or is not a valid intrinsic property. The Value property of the RenameWarning
+	// wil be populated with the name of the requested property.
+	RenameWarningtypePropertyMissing
+)
+
+// RenameWarning contains information about potential name generation issues. For example,
+// when the output name requires a property that is either not declared or whose value is
+// empty.
+type RenameWarning struct {
+	Type  int
+	Value string
+}
+
+// String returns the warning message ready to be printed in the log/stdout
+func (w *RenameWarning) String(entry RenameLogEntry) string {
+	switch w.Type {
+	case RenameWarningTypePropertyValueEmpty:
+		return fmt.Sprintf("WARNING: Could not extract property %s from original file name: %s ", w.Value, entry.OriginalFileName)
+	case RenameWarningtypePropertyMissing:
+		return fmt.Sprintf("WARNING: Output file name asks for property %s which is not delcared", w.Value)
+	}
+	return ""
+}
+
 // RenameLogEntry records an operation performed in a file and can be used to undo
 // the rename
 type RenameLogEntry struct {
@@ -20,6 +51,11 @@ type RenameLogEntry struct {
 	// options since it could have a significant impact on performance
 	OriginalFileChecksum string
 	NewFileName          string
+	// Warnings lists potential issues found while renaming the file
+	Warnings []RenameWarning
+	// Collisions points to other entries in the log that the new generated name for this
+	// entry collides with
+	Collisions []int
 }
 
 // RenameLog is a slice of RenameLogEntry objects that record all of the opertaions
@@ -33,6 +69,7 @@ type RenameLog = []RenameLogEntry
 // renamed and the output, generated name is printed out
 func RenameAllFiles(p []Prop, tokens TokenStream, files []string, opts Opts) (RenameLog, error) {
 	rlog := make([]RenameLogEntry, len(files))
+	collisions := make(map[string][]int)
 	for idx, f := range files {
 		absPath, err := filepath.Abs(f)
 		if err != nil {
@@ -53,13 +90,28 @@ func RenameAllFiles(p []Prop, tokens TokenStream, files []string, opts Opts) (Re
 			varValues[k] = v(state)
 		}
 
-		outName, err := GenerateName(varValues, tokens, state, opts)
+		outName, warnings, err := GenerateName(varValues, tokens, state, opts)
 		if err != nil {
 			return rlog[:idx], err
 		}
 
 		if opts.Verbose {
 			fmt.Fprintf(os.Stderr, "Renaming \"%s\" to \"%s\"\n", fileName, outName)
+		}
+
+		c, ok := collisions[outName]
+		if !ok {
+			collisions[outName] = make([]int, 1)
+			collisions[outName][0] = idx
+		} else {
+			collisions[outName] = append(c, idx)
+		}
+
+		rlog[idx] = RenameLogEntry{
+			OriginalFileName: fileName,
+			NewFileName:      outName,
+			Warnings:         warnings,
+			// we'll append the collisions at teh end, once we have a fully populated map
 		}
 
 		if !opts.DryRun {
@@ -71,21 +123,29 @@ func RenameAllFiles(p []Prop, tokens TokenStream, files []string, opts Opts) (Re
 			if err != nil {
 				return rlog[:idx], fmt.Errorf("Error while renaming %s to %s: %v", fileName, outName, err)
 			}
-			rlog[idx] = RenameLogEntry{
-				OriginalFileName: fileName,
-				NewFileName:      outName,
-			}
+
 			fmt.Println(outName)
 		} else {
 			dryRunPrint(fileName, outName)
+		}
+	}
+
+	// populate collisions
+	// TODO: Validate output file name
+	for _, v := range collisions {
+		if len(v) > 1 {
+			for _, idx := range v {
+				rlog[idx].Collisions = v
+			}
 		}
 	}
 	return rlog, nil
 }
 
 // GenerateName uses the variable values to generate a string based on the input TokenStream
-func GenerateName(varValues VarValues, out TokenStream, rstate renamerState, opts Opts) (string, error) {
+func GenerateName(varValues VarValues, out TokenStream, rstate renamerState, opts Opts) (string, []RenameWarning, error) {
 	outName := ""
+	warnings := make([]RenameWarning, 0)
 	for _, t := range out {
 		if t.Type == TokenTypeLiteral {
 			outName += t.Value
@@ -96,11 +156,21 @@ func GenerateName(varValues VarValues, out TokenStream, rstate renamerState, opt
 			propValue, ok := varValues[t.Value]
 			if !ok {
 				fmt.Fprintf(os.Stderr, "WARNING: Output asks for value %s that is not declared as a property\n", t.Value)
+				warnings = append(warnings, RenameWarning{
+					Type:  RenameWarningtypePropertyMissing,
+					Value: t.Value,
+				})
 				continue
 			}
 
-			if propValue == "" && opts.Verbose {
-				fmt.Fprintf(os.Stderr, "WARNING: Value for property %s is empty\n", t.Value)
+			if propValue == "" {
+				if opts.Verbose {
+					fmt.Fprintf(os.Stderr, "WARNING: Value for property %s is empty\n", t.Value)
+				}
+				warnings = append(warnings, RenameWarning{
+					Type:  RenameWarningTypePropertyValueEmpty,
+					Value: t.Value,
+				})
 			}
 
 			if t.Formatter != nil {
@@ -108,7 +178,7 @@ func GenerateName(varValues VarValues, out TokenStream, rstate renamerState, opt
 				for _, f := range t.Formatter {
 					fout, err := f.Format(formattedValue, rstate)
 					if err != nil {
-						return "", err
+						return "", warnings, err
 					}
 					formattedValue = fout
 				}
@@ -118,7 +188,7 @@ func GenerateName(varValues VarValues, out TokenStream, rstate renamerState, opt
 			}
 		}
 	}
-	return outName, nil
+	return outName, warnings, nil
 }
 
 // Undo looks for a rename log file in the given folder and reverses the change to the files listed in the log

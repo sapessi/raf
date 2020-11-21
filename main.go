@@ -7,11 +7,17 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
+	"github.com/fatih/color"
 	cli "github.com/urfave/cli/v2"
 )
 
 const rafStatusFile = ".raf"
+
+// TODO: this is an ugly hack for the unit tests. We should formalize this
+// as a parameter
+var writeTestRLog = false
 
 type output struct {
 	Raw            string
@@ -67,11 +73,40 @@ func rename(c *cli.Context) error {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if !opts.DryRun {
+	if !opts.DryRun || writeTestRLog {
 		err = writeRenameLog(rlog, c)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Could not write rename log %v\n", err)
 			os.Exit(1)
+		}
+	}
+	if opts.DryRun {
+		// print out warnings
+		yellow := color.New(color.FgYellow).SprintFunc()
+		for _, e := range rlog {
+			if e.Warnings != nil && len(e.Warnings) > 0 {
+				for _, w := range e.Warnings {
+					fmt.Fprintln(os.Stderr, yellow(w.String(e)))
+				}
+			}
+		}
+		// print out collisions
+		printed := make([]bool, len(rlog))
+		red := color.New(color.FgHiRed).SprintFunc()
+		for logidx, e := range rlog {
+			if e.Collisions != nil && !printed[logidx] && len(e.Collisions) > 0 {
+				collisionLog := fmt.Sprintf("[ERROR] File %s would be rename to %s and would collide with: ", e.OriginalFileName, e.NewFileName)
+				otherNames := make([]string, len(e.Collisions)-1) // -1 because it always includes itself
+				for cidx, c := range e.Collisions {
+					if c != logidx {
+						otherNames[cidx-1] = rlog[c].OriginalFileName
+						printed[c] = true
+					}
+				}
+				collisionLog += strings.Join(otherNames, ", ")
+				fmt.Fprintln(os.Stderr, red(collisionLog))
+				printed[logidx] = true
+			}
 		}
 	}
 	return nil

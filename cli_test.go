@@ -73,6 +73,40 @@ func TestUndo(t *testing.T) {
 	assert.Equal(t, "[UnionVideos] Wedding - 2 - Chapel.mkv", files[1])
 }
 
+func TestCollisions(t *testing.T) {
+	writeTestRLog = true
+	testCtx, err := createIntegTestContext(t)
+	assert.Nil(t, err)
+
+	err = testCtx.CreateFiles("[UnionVideos] Wedding - $cnt - $title.mkv", "Home", "Chapel", "_Church", "_Reception", "Party")
+	assert.Nil(t, err)
+
+	app := getApp()
+	args := []string{"raf", "--prop", "title=\\d\\ \\-\\ ([A-Za-z0-9]+)\\.mkv", "--output", "test - $title.avi", "-d"}
+	args = append(args, testCtx.Files(true)...)
+	err = app.Run(args)
+	assert.Nil(t, err)
+
+	log, err := testCtx.RLog()
+	assert.Nil(t, err)
+	assert.NotNil(t, log)
+	assert.Equal(t, 5, len(log))
+
+	// we expect a conflict between entries 2 and 3 in the log
+	churchEntry := log[2]
+	assert.NotNil(t, churchEntry)
+	assert.Equal(t, "test - .avi", churchEntry.NewFileName)
+	// we shouldn't be able to extract the title because the name starts with _
+	assert.Equal(t, 1, len(churchEntry.Warnings))
+	assert.Equal(t, RenameWarningTypePropertyValueEmpty, churchEntry.Warnings[0].Type)
+
+	// I should have a collission between the two entries
+	receptionEntry := log[3]
+	assert.Equal(t, 2, len(receptionEntry.Collisions))
+	assert.Equal(t, 2, receptionEntry.Collisions[0])
+	assert.Equal(t, 3, receptionEntry.Collisions[1])
+}
+
 type integTestContext struct {
 	filesDir string
 	files    []string
@@ -180,4 +214,8 @@ func (t *integTestContext) CreateFiles(pattern string, titles ...string) error {
 		}
 	}
 	return nil
+}
+
+func (t *integTestContext) RLog() (RenameLog, error) {
+	return readRenameLog(t.filesDir + string(os.PathSeparator) + rafStatusFile)
 }
