@@ -55,7 +55,7 @@ func TestRenameStringSimple(t *testing.T) {
 	out, err := ParseOutput("rip - $title.mkv")
 	assert.Nil(t, err)
 
-	renamed, err := GenerateName(values, out, mockState(0), Opts{})
+	renamed, _, err := GenerateName(values, out, mockState(0), Opts{})
 	assert.Nil(t, err)
 	assert.Equal(t, "rip - test title.mkv", renamed)
 }
@@ -66,8 +66,12 @@ func TestRenameStringMissingProperty(t *testing.T) {
 	out, err := ParseOutput("rip - $title2.mkv")
 	assert.Nil(t, err)
 
-	renamed, err := GenerateName(values, out, mockState(0), Opts{})
+	renamed, warn, err := GenerateName(values, out, mockState(0), Opts{})
 	assert.Nil(t, err)
+	assert.NotNil(t, warn)
+	assert.Equal(t, 1, len(warn))
+	assert.Equal(t, RenameWarningtypePropertyMissing, warn[0].Type)
+	assert.Equal(t, "$title2", warn[0].Value)
 	assert.Equal(t, "rip - .mkv", renamed)
 }
 
@@ -78,7 +82,7 @@ func TestRenamePaddingFormatter(t *testing.T) {
 	out, err := ParseOutput("rip - $cnt[%03] - $title.mkv")
 	assert.Nil(t, err)
 
-	renamed, err := GenerateName(values, out, mockState(0), Opts{})
+	renamed, _, err := GenerateName(values, out, mockState(0), Opts{})
 	assert.Nil(t, err)
 	assert.Equal(t, "rip - 001 - test title.mkv", renamed)
 }
