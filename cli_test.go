@@ -105,6 +105,7 @@ func TestCollisions(t *testing.T) {
 	assert.Equal(t, 2, len(receptionEntry.Collisions))
 	assert.Equal(t, 2, receptionEntry.Collisions[0])
 	assert.Equal(t, 3, receptionEntry.Collisions[1])
+	writeTestRLog = false
 }
 
 type integTestContext struct {
@@ -217,5 +218,5 @@ func (t *integTestContext) CreateFiles(pattern string, titles ...string) error {
 }
 
 func (t *integTestContext) RLog() (RenameLog, error) {
-	return readRenameLog(t.filesDir + string(os.PathSeparator) + rafStatusFile)
+	return ReadRenameLog(t.filesDir + string(os.PathSeparator) + rafStatusFile)
 }

@@ -1,11 +1,10 @@
 package main
 
 import (
+	"encoding/gob"
 	"fmt"
 	"os"
 	"path/filepath"
-
-	"github.com/fatih/color"
 )
 
 // VarValues stores the values parsed from the original name of the file based on the
@@ -22,6 +21,10 @@ const (
 	// name or is not a valid intrinsic property. The Value property of the RenameWarning
 	// wil be populated with the name of the requested property.
 	RenameWarningtypePropertyMissing
+	// RenameWarningTypeFileDoesNotExist is used to report the fact that the original
+	// file raf has been asked to rename does not exist in the file system. The Value
+	// property of the RenameWarning will be populated with the original file name
+	RenameWarningTypeFileDoesNotExist
 )
 
 // RenameWarning contains information about potential name generation issues. For example,
@@ -64,19 +67,17 @@ type RenameLog = []RenameLogEntry
 
 // RenameAllFiles iterates over the files passed as input and for each one, extracts the
 // property values, populates the intrinsic properties, and calls the GenerateName function.
-//
-// If the DryRun property of the Opts object is set to true the files are not actually
-// renamed and the output, generated name is printed out
+// The output RenameLog file can be passed to the Apply() function to perform the changes.
 func RenameAllFiles(p []Prop, tokens TokenStream, files []string, opts Opts) (RenameLog, error) {
 	rlog := make([]RenameLogEntry, len(files))
 	collisions := make(map[string][]int)
 	for idx, f := range files {
-		absPath, err := filepath.Abs(f)
+		_, err := filepath.Abs(f)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Could not determine absolute path for %s: %s\n", f, err)
 			return rlog[:idx], err
 		}
-		baseDir := filepath.Dir(absPath)
+		//baseDir := filepath.Dir(absPath)
 
 		fileName := filepath.Base(f)
 		state := renamerState{
@@ -112,21 +113,6 @@ func RenameAllFiles(p []Prop, tokens TokenStream, files []string, opts Opts) (Re
 			NewFileName:      outName,
 			Warnings:         warnings,
 			// we'll append the collisions at teh end, once we have a fully populated map
-		}
-
-		if !opts.DryRun {
-			outPath := baseDir + string(os.PathSeparator) + outName
-			if _, err := os.Stat(outPath); err == nil {
-				return rlog[:idx], fmt.Errorf("The file %s already exists", outPath)
-			}
-			err := os.Rename(baseDir+string(os.PathSeparator)+fileName, baseDir+string(os.PathSeparator)+outName)
-			if err != nil {
-				return rlog[:idx], fmt.Errorf("Error while renaming %s to %s: %v", fileName, outName, err)
-			}
-
-			fmt.Println(outName)
-		} else {
-			dryRunPrint(fileName, outName)
 		}
 	}
 
@@ -191,40 +177,50 @@ func GenerateName(varValues VarValues, out TokenStream, rstate renamerState, opt
 	return outName, warnings, nil
 }
 
-// Undo looks for a rename log file in the given folder and reverses the change to the files listed in the log
-func Undo(cwd string, opts Opts) error {
+// Undo looks for a rename log file in the given folder and reverses the change to the files listed in the log.
+// Returns a flipped RenameLog that can be passed to the Apply() function
+func Undo(cwd string, opts Opts) (RenameLog, error) {
 	abs, err := filepath.Abs(cwd)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	rafPath, err := os.Stat(abs)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !rafPath.IsDir() {
-		return fmt.Errorf("%s is not a valid directory. The undo command receives the path to a directory containing a %s file", rafPath, rafStatusFile)
+		return nil, fmt.Errorf("%s is not a valid directory. The undo command receives the path to a directory containing a %s file", rafPath, rafStatusFile)
 	}
 	rafFilePath := abs + string(os.PathSeparator) + rafStatusFile
 	if _, err = os.Stat(rafFilePath); os.IsNotExist(err) {
-		return fmt.Errorf("The directory %s does not contain a valid raf status file (%s)", abs, rafStatusFile)
+		return nil, fmt.Errorf("The directory %s does not contain a valid raf status file (%s)", abs, rafStatusFile)
 	}
-	rlog, err := readRenameLog(rafFilePath)
+	rlog, err := ReadRenameLog(rafFilePath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if len(rlog) == 0 {
-		return fmt.Errorf("The raf status file %s does not contain any log entries", rafFilePath)
+		return nil, fmt.Errorf("The raf status file %s does not contain any log entries", rafFilePath)
 	}
 	if opts.Verbose {
 		fmt.Fprintf(os.Stderr, "Beginning raf undo in folder %s", abs)
 	}
 
-	for _, entry := range rlog {
+	flipRlog := make([]RenameLogEntry, len(rlog))
+	collisions := make(map[string][]int)
+	for idx, entry := range rlog {
+		warnings := make([]RenameWarning, 0)
 		curFilePath := abs + string(os.PathSeparator) + entry.NewFileName
 		newFilePath := abs + string(os.PathSeparator) + entry.OriginalFileName
 		// new file must exists
 		if _, err = os.Stat(curFilePath); os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "WARNING: File %s from raf log not found", entry.NewFileName)
+			if opts.Verbose {
+				fmt.Fprintf(os.Stderr, "WARNING: File %s from raf log not found", entry.NewFileName)
+			}
+			warnings = append(warnings, RenameWarning{
+				Type:  RenameWarningTypeFileDoesNotExist,
+				Value: entry.NewFileName,
+			})
 			continue
 		}
 		// original file must not
@@ -233,28 +229,82 @@ func Undo(cwd string, opts Opts) error {
 			continue
 		}
 
-		if !opts.DryRun {
-			err = os.Rename(curFilePath, newFilePath)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "ERROR: Could not rename file %s to %s: %v", curFilePath, newFilePath, err)
-			}
-			fmt.Println(entry.OriginalFileName)
+		c, ok := collisions[entry.OriginalFileName]
+		if !ok {
+			collisions[entry.OriginalFileName] = make([]int, 1)
+			collisions[entry.OriginalFileName][0] = idx
 		} else {
-			dryRunPrint(entry.NewFileName, entry.OriginalFileName)
+			collisions[entry.OriginalFileName] = append(c, idx)
+		}
+
+		flipRlog[idx] = RenameLogEntry{
+			OriginalFileName: entry.NewFileName,
+			NewFileName:      entry.OriginalFileName,
+			Warnings:         warnings,
 		}
 	}
 
-	err = os.Remove(rafFilePath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "WARNING: Could not remove raf status file %s. This is not a critical issue since the file will be overwritten automatically if raf is executed again in this folder", rafFilePath)
+	// populate collisions
+	// TODO: Validate output file name
+	for _, v := range collisions {
+		if len(v) > 1 {
+			for _, idx := range v {
+				flipRlog[idx].Collisions = v
+			}
+		}
 	}
-	return nil
+	return flipRlog, nil
 }
 
-func dryRunPrint(from, to string) {
-	red := color.New(color.FgHiRed).SprintFunc()
-	green := color.New(color.FgGreen).SprintFunc()
-	fmt.Printf("File %s -> %s\n", red(from), green(to))
+// Apply makes the changes outlined by the given RenameLog in the given path. Apply will not handle
+// collisions or warnings in the log, the function will attempt to use the os.Rename method to
+// perform the action and if an error is thrown return the os error.
+func Apply(rlog RenameLog, path string, opts Opts) error {
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return err
+	}
+	pathStat, err := os.Stat(absPath)
+	if err != nil {
+		return err
+	}
+	if !pathStat.IsDir() {
+		return fmt.Errorf("The given path %s is not a directory", path)
+	}
+
+	for idx, e := range rlog {
+		origFile := absPath + string(os.PathSeparator) + e.OriginalFileName
+		newFile := absPath + string(os.PathSeparator) + e.NewFileName
+
+		err = os.Rename(origFile, newFile)
+		if err != nil {
+			if writeErr := writeRenameLog(rlog[:idx], absPath); writeErr != nil {
+				fmt.Fprintf(os.Stderr, "FATAL: Could not write rename log after rename error: %s", writeErr)
+			}
+			return err
+		}
+	}
+
+	// write new log file
+	return writeRenameLog(rlog, absPath)
+}
+
+// ReadRenameLog parses a RenameLog file at the given path and unmarshals it into a
+// RenameLog object (slice of RenameLogEntry)
+func ReadRenameLog(path string) (RenameLog, error) {
+	reader, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+
+	decoder := gob.NewDecoder(reader)
+	var rlog RenameLog
+	err = decoder.Decode(&rlog)
+	if err != nil {
+		return nil, err
+	}
+	return rlog, nil
 }
 
 type renamerState struct {
@@ -281,4 +331,32 @@ func extractVarValues(fname string, p []Prop, opts Opts) VarValues {
 	}
 
 	return varValues
+}
+
+func writeRenameLog(rlog RenameLog, absPath string) error {
+	statusFile := absPath + string(os.PathSeparator) + rafStatusFile
+
+	_, err := os.Stat(statusFile)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+	} else {
+		err = os.Remove(statusFile)
+		if err != nil {
+			return err
+		}
+
+	}
+	statusFileWriter, err := os.Create(statusFile)
+	if err != nil {
+		return err
+	}
+	defer statusFileWriter.Close()
+	gobEncoder := gob.NewEncoder(statusFileWriter)
+	err = gobEncoder.Encode(rlog)
+	if err != nil {
+		return err
+	}
+	return nil
 }

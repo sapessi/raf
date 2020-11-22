@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/gob"
 	"errors"
 	"fmt"
 	"log"
@@ -44,43 +43,45 @@ func main() {
 func undo(c *cli.Context) error {
 	path := c.Args().First()
 	opts := readOpts(c)
-	return Undo(path, opts)
+	rlog, err := Undo(path, opts)
+	if err != nil {
+		return err
+	}
+	return Apply(rlog, path, opts)
+
 }
 
 func rename(c *cli.Context) error {
 	matches, err := validateMatcher(c)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 	props, err := validateProps(c)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 	out, err := validateOutput(c)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 	if len(props) < out.CustomVarCount {
-		fmt.Printf("The command declared %d properties but uses %d in the output formatter\n", len(props), out.CustomVarCount)
-		os.Exit(1)
+		return fmt.Errorf("The command declared %d properties but uses %d in the output formatter\n", len(props), out.CustomVarCount)
 	}
 	opts := readOpts(c)
 	rlog, err := RenameAllFiles(props, out.Tokens, matches, opts)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return err
 	}
-	if !opts.DryRun || writeTestRLog {
-		err = writeRenameLog(rlog, c)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Could not write rename log %v\n", err)
-			os.Exit(1)
-		}
+	path := filepath.Dir(matches[0])
+	if !opts.DryRun {
+		return Apply(rlog, path, opts)
 	}
 	if opts.DryRun {
+		for _, e := range rlog {
+			dryRunPrint(e.OriginalFileName, e.NewFileName)
+		}
+		fmt.Fprintln(os.Stderr)
+
 		// print out warnings
 		yellow := color.New(color.FgYellow).SprintFunc()
 		for _, e := range rlog {
@@ -95,7 +96,7 @@ func rename(c *cli.Context) error {
 		red := color.New(color.FgHiRed).SprintFunc()
 		for logidx, e := range rlog {
 			if e.Collisions != nil && !printed[logidx] && len(e.Collisions) > 0 {
-				collisionLog := fmt.Sprintf("[ERROR] File %s would be rename to %s and would collide with: ", e.OriginalFileName, e.NewFileName)
+				collisionLog := fmt.Sprintf("[ERROR] File \"%s\" would be renamed to \"%s\" and would collide with: ", e.OriginalFileName, e.NewFileName)
 				otherNames := make([]string, len(e.Collisions)-1) // -1 because it always includes itself
 				for cidx, c := range e.Collisions {
 					if c != logidx {
@@ -107,6 +108,14 @@ func rename(c *cli.Context) error {
 				fmt.Fprintln(os.Stderr, red(collisionLog))
 				printed[logidx] = true
 			}
+		}
+	}
+
+	if writeTestRLog {
+		err = writeRenameLog(rlog, path)
+		if err != nil {
+			return fmt.Errorf("Could not write rename log %v\n", err)
+
 		}
 	}
 	return nil
@@ -219,51 +228,8 @@ func validateOutput(c *cli.Context) (*output, error) {
 	}, nil
 }
 
-func writeRenameLog(rlog RenameLog, c *cli.Context) error {
-	// get folder
-	absPath, err := filepath.Abs(c.Args().First())
-	if err != nil {
-		return err
-	}
-	statusFile := filepath.Dir(absPath) + string(os.PathSeparator) + rafStatusFile
-
-	_, err = os.Stat(statusFile)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return err
-		}
-	} else {
-		err = os.Remove(statusFile)
-		if err != nil {
-			return err
-		}
-
-	}
-	statusFileWriter, err := os.Create(statusFile)
-	if err != nil {
-		return err
-	}
-	defer statusFileWriter.Close()
-	gobEncoder := gob.NewEncoder(statusFileWriter)
-	err = gobEncoder.Encode(rlog)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func readRenameLog(path string) (RenameLog, error) {
-	reader, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer reader.Close()
-
-	decoder := gob.NewDecoder(reader)
-	var rlog RenameLog
-	err = decoder.Decode(&rlog)
-	if err != nil {
-		return nil, err
-	}
-	return rlog, nil
+func dryRunPrint(from, to string) {
+	red := color.New(color.FgHiRed).SprintFunc()
+	green := color.New(color.FgGreen).SprintFunc()
+	fmt.Printf("File %s -> %s\n", red(from), green(to))
 }
