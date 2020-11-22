@@ -40,6 +40,51 @@ func main() {
 	}
 }
 
+func getApp() *cli.App {
+	cli.VersionFlag = &cli.BoolFlag{
+		Name:    "version",
+		Aliases: []string{"V"},
+		Usage:   "print raf version",
+	}
+	return &cli.App{
+		Name:        "raf",
+		Usage:       "raf -p \"title=Video\\ \\d+\\ \\-\\ ([A-Za-z0-9\\ ]+)_\" -d -o 'UnionStudio - $cnt - $title.mkv' *",
+		Description: cliDescription,
+		Version:     "v0.1",
+		Flags: []cli.Flag{
+			&cli.StringSliceFlag{
+				Name:    "prop",
+				Aliases: []string{"p"},
+				//Usage:   "-p \"title=Video\\ \\d+\\ \\-\\ ([A-Za-z0-9\\ ]+)_\"",
+				Usage: propFlagDescription,
+			},
+			&cli.StringFlag{
+				Name:    "output",
+				Aliases: []string{"o"},
+				Usage:   outputFlagDescription,
+			},
+			&cli.BoolFlag{
+				Name:    "dryrun",
+				Aliases: []string{"d"},
+				Usage:   dryRunFlagDescription,
+			},
+			&cli.BoolFlag{
+				Name:    "verbose",
+				Aliases: []string{"v"},
+				Usage:   "Prints verbose output",
+			},
+		},
+		Action: rename,
+		Commands: []*cli.Command{
+			{
+				Name:   "undo",
+				Usage:  undoCommandDescription,
+				Action: undo,
+			},
+		},
+	}
+}
+
 func undo(c *cli.Context) error {
 	path := c.Args().First()
 	opts := readOpts(c)
@@ -119,51 +164,6 @@ func rename(c *cli.Context) error {
 		}
 	}
 	return nil
-}
-
-func getApp() *cli.App {
-	cli.VersionFlag = &cli.BoolFlag{
-		Name:    "version",
-		Aliases: []string{"V"},
-		Usage:   "print raf version",
-	}
-	return &cli.App{
-		Name:        "raf",
-		Usage:       "raf -p \"title=Video\\ \\d+\\ \\-\\ ([A-Za-z0-9\\ ]+)_\" -d -o 'UnionStudio - $cnt - $title.mkv' *",
-		Description: cliDescription,
-		Version:     "v0.1",
-		Flags: []cli.Flag{
-			&cli.StringSliceFlag{
-				Name:    "prop",
-				Aliases: []string{"p"},
-				//Usage:   "-p \"title=Video\\ \\d+\\ \\-\\ ([A-Za-z0-9\\ ]+)_\"",
-				Usage: propFlagDescription,
-			},
-			&cli.StringFlag{
-				Name:    "output",
-				Aliases: []string{"o"},
-				Usage:   outputFlagDescription,
-			},
-			&cli.BoolFlag{
-				Name:    "dryrun",
-				Aliases: []string{"d"},
-				Usage:   dryRunFlagDescription,
-			},
-			&cli.BoolFlag{
-				Name:    "verbose",
-				Aliases: []string{"v"},
-				Usage:   "Prints verbose output",
-			},
-		},
-		Action: rename,
-		Commands: []*cli.Command{
-			{
-				Name:   "undo",
-				Usage:  undoCommandDescription,
-				Action: undo,
-			},
-		},
-	}
 }
 
 func readOpts(c *cli.Context) Opts {
