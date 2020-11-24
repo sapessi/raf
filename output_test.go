@@ -141,10 +141,46 @@ func TestPaddingFormatterInCnt(t *testing.T) {
 	assert.Equal(t, '0', pformatter.PadCharacter)
 }
 
+func TestSliceFormatterParser(t *testing.T) {
+	parser := newParser("$title[>:10]") // max 50 chars
+	tokens, err := parser.parse()
+
+	assert.Nil(t, err)
+	assert.Equal(t, 1, len(tokens))
+	assert.Equal(t, tokens[0].Type, TokenTypeProperty)
+	assert.Equal(t, 1, len(tokens[0].Formatter))
+	assert.IsType(t, &SliceFormatter{}, tokens[0].Formatter[0])
+	sliceFormatter := tokens[0].Formatter[0].(*SliceFormatter)
+	assert.Equal(t, -1, sliceFormatter.Start)
+	assert.Equal(t, 10, sliceFormatter.End)
+
+	parser = newParser("$title[>3:]") // max 50 chars
+	tokens, err = parser.parse()
+	assert.Nil(t, err)
+	assert.Equal(t, 1, len(tokens))
+	assert.Equal(t, tokens[0].Type, TokenTypeProperty)
+	assert.Equal(t, 1, len(tokens[0].Formatter))
+	assert.IsType(t, &SliceFormatter{}, tokens[0].Formatter[0])
+	sliceFormatter = tokens[0].Formatter[0].(*SliceFormatter)
+	assert.Equal(t, 3, sliceFormatter.Start)
+	assert.Equal(t, -1, sliceFormatter.End)
+
+	parser = newParser("$title[>3:10]") // max 50 chars
+	tokens, err = parser.parse()
+	assert.Nil(t, err)
+	assert.Equal(t, 1, len(tokens))
+	assert.Equal(t, tokens[0].Type, TokenTypeProperty)
+	assert.Equal(t, 1, len(tokens[0].Formatter))
+	assert.IsType(t, &SliceFormatter{}, tokens[0].Formatter[0])
+	sliceFormatter = tokens[0].Formatter[0].(*SliceFormatter)
+	assert.Equal(t, 3, sliceFormatter.Start)
+	assert.Equal(t, 10, sliceFormatter.End)
+}
+
 func TestUnknownFormatter(t *testing.T) {
-	parser := newParser("$cnt[>10]")
+	parser := newParser("$cnt[+10]")
 	_, err := parser.parse()
 
 	assert.NotNil(t, err)
-	assert.EqualError(t, err, "Unknown formatter type >")
+	assert.EqualError(t, err, "Unknown formatter type +")
 }

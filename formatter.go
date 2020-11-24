@@ -40,3 +40,38 @@ func (f *PaddingFormatter) Format(value string, rstate renamerState) (string, er
 	newValue += value
 	return newValue, nil
 }
+
+// SliceFormatter can cut a substring out of a value. The slice formatter is called with the &gt;
+// character and receives two parameters separated by ":": The beginning index at which to cut the value
+// and the end index. If either value is left blank the system assumes 0 for the beginning and max
+// for the end. For example, >:10 declares a formatter that cuts values to a maximum length of 10
+// characters. If the starting index is higher than the length of the value the formatter will return
+// an empty string.
+type SliceFormatter struct {
+	Start int
+	End   int
+}
+
+// NewSliceFormatter initializes a new SliceFormatter with the given start and end indexes
+func NewSliceFormatter(start, end int) SliceFormatter {
+	return SliceFormatter{
+		Start: start,
+		End:   end,
+	}
+}
+
+// Format trims the string to the start and end points specified by the SliceFormatter
+func (f *SliceFormatter) Format(value string, rstate renamerState) (string, error) {
+	strlen := len(value)
+	strstart := 0
+	if f.Start > 0 {
+		strstart = f.Start
+	}
+	if strstart > strlen {
+		return "", nil
+	}
+	if f.End > 0 && f.End < strlen {
+		strlen = f.End
+	}
+	return value[strstart:strlen], nil
+}

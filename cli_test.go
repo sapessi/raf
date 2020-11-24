@@ -108,6 +108,29 @@ func TestCollisions(t *testing.T) {
 	writeTestRLog = false
 }
 
+func TestTitleWithSliceFormatter(t *testing.T) {
+	testCtx, err := createIntegTestContext(t)
+	assert.Nil(t, err)
+
+	err = testCtx.CreateFiles("[UnionVideos] Wedding - $cnt - $title.mkv", "Home", "Chapel", "Church", "Reception", "Party")
+	assert.Nil(t, err)
+
+	app := getApp()
+	args := []string{"raf", "--prop", "title=\\d\\ \\-\\ ([A-Za-z0-9]+)\\.mkv", "--output", "test - $cnt - $title[>:3].avi"}
+	args = append(args, testCtx.Files(true)...)
+	err = app.Run(args)
+	assert.Nil(t, err)
+
+	files, err := testCtx.ListFilesInWorkingDir(false, false)
+	assert.Nil(t, err)
+	assert.Equal(t, 5, len(files))
+	assert.Equal(t, "test - 1 - Hom.avi", files[0])
+	assert.Equal(t, "test - 2 - Cha.avi", files[1])
+	assert.Equal(t, "test - 3 - Chu.avi", files[2])
+	assert.Equal(t, "test - 4 - Rec.avi", files[3])
+	assert.Equal(t, "test - 5 - Par.avi", files[4])
+}
+
 func TestPartialRenameLog(t *testing.T) {
 	testCtx, err := createIntegTestContext(t)
 	assert.Nil(t, err)
