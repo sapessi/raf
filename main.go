@@ -50,7 +50,7 @@ func getApp() *cli.App {
 		Name:        "raf",
 		Usage:       "raf -p \"title=Video\\ \\d+\\ \\-\\ ([A-Za-z0-9\\ ]+)_\" -d -o 'UnionStudio - $cnt - $title.mkv' *",
 		Description: cliDescription,
-		Version:     "v0.1",
+		Version:     "v0.3.0",
 		Flags: []cli.Flag{
 			&cli.StringSliceFlag{
 				Name:    "prop",
