@@ -108,6 +108,25 @@ func TestCollisions(t *testing.T) {
 	writeTestRLog = false
 }
 
+func TestPartialRenameLog(t *testing.T) {
+	testCtx, err := createIntegTestContext(t)
+	assert.Nil(t, err)
+
+	err = testCtx.CreateFiles("[UnionVideos] Wedding - $cnt - $title.mkv", "Home", "Chapel", "_Church", "_Reception", "Party")
+	assert.Nil(t, err)
+	os.Mkdir(testCtx.filesDir+string(os.PathSeparator)+"test - .avi", os.ModeAppend)
+
+	app := getApp()
+	args := []string{"raf", "--prop", "title=\\d\\ \\-\\ ([A-Za-z0-9]+)\\.mkv", "--output", "test - $title.avi"}
+	args = append(args, testCtx.Files(true)...)
+	err = app.Run(args)
+	assert.NotNil(t, err)
+
+	log, err := testCtx.RLog()
+	assert.Nil(t, err)
+	assert.Equal(t, 2, len(log))
+}
+
 type integTestContext struct {
 	filesDir string
 	files    []string
