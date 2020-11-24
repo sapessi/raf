@@ -13,8 +13,8 @@ const propFlagDescription = "The prop flag tells raf to extract text from the or
 
 const outputFlagDescription = "The output flag specifies the pattern to generate new file names. To include a variable it should be " +
 	"referenced with a dollar ($) sign. Additionally, variable can include formatting directives enclosed in square brackets [ ] after their " +
-	"name. Raf provides the following variables: $cnt - counter of files processed starting at 1; $ext - extension of the original file; " +
-	"$fname - full name of the original file excluding its extension."
+	"name - see man page for more information. Raf provides the following variables: $cnt - counter of files processed starting at 1; $ext - " +
+	"extension of the original file; $fname - full name of the original file excluding its extension."
 
 const dryRunFlagDescription = "Dry run mode makes raf print to stderr the operations it would perform in the format \"File <original name> " +
 	"-> <new file name>\" without actually renaming the file."
