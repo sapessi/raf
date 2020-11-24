@@ -62,7 +62,10 @@ Extension of the original file
 .SH FORMATTERS
 Formatters can be applied to properties during output generation. The value of one property can be passed through
 multiple formatters in a pipeline. Formatters follow the property name in-between square brackets \fI$cnt[%03]\fP.
-Each formatter is identified by a special symbol and receives a number of paramters.
+Each formatter is identified by a special symbol and receives a number of paramters. Multiple formatters are chained
+using \fI,\fP. For example, the property \fI$title[/\\./ /,>:11]\fP contains a replacing formatter that swaps dots 
+for spaces and a slice formatter that trims the length to 11 characters, when applied to the string "my.home.video" 
+would result in the following string as output: "my home vid".
 
 .TP
 \fB%[char][length] - padding formatter\fP

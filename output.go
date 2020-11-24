@@ -149,6 +149,10 @@ func (p *statefulParser) parseFormatters() (FormattingPipeline, error) {
 	// switch by formatter type
 	for !p.isLast() && p.peek() != ']' {
 		chr := p.peek()
+		if chr == ',' { // multiple formatters, skip the comma and move to the next
+			p.nextChr()
+			chr = p.peek()
+		}
 		var formatter Formatter
 		var err error
 		switch chr {
