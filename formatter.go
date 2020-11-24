@@ -1,5 +1,10 @@
 package main
 
+import (
+	"regexp"
+	"strings"
+)
+
 // Formatter defines the format method that receives the value it should operate on and the current
 // renamer state. All formatter must adhere to this interface to be part of a FormattingPipeline
 type Formatter interface {
@@ -74,4 +79,40 @@ func (f *SliceFormatter) Format(value string, rstate renamerState) (string, erro
 		strlen = f.End
 	}
 	return value[strstart:strlen], nil
+}
+
+// ReplacingFormatter portions of a property's value that match the Pattern property with the
+// string Value.
+type ReplacingFormatter struct {
+	Pattern       *regexp.Regexp
+	PatternString string
+	Value         string
+}
+
+// NewReplacingFormatter creates a new replacing formatter and attempts to compile the given from
+// string into a regular expression
+func NewReplacingFormatter(from, to string) (ReplacingFormatter, error) {
+	regex, err := regexp.Compile(from)
+	if err != nil {
+		return ReplacingFormatter{}, err
+	}
+	return ReplacingFormatter{
+		Pattern:       regex,
+		PatternString: from,
+		Value:         to,
+	}, nil
+}
+
+// Format performs the replacement of the matched values in the given value string
+func (f *ReplacingFormatter) Format(value string, rstate renamerState) (string, error) {
+	matches := f.Pattern.FindAllStringSubmatch(value, -1)
+	if matches == nil {
+		return value, nil
+	}
+	outValue := value
+	for _, m := range matches {
+		match := m[len(m)-1]
+		outValue = strings.ReplaceAll(outValue, match, f.Value)
+	}
+	return outValue, nil
 }

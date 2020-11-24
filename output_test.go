@@ -177,6 +177,49 @@ func TestSliceFormatterParser(t *testing.T) {
 	assert.Equal(t, 10, sliceFormatter.End)
 }
 
+func TestReplacingFormatterParser(t *testing.T) {
+	// regular str
+	parser := newParser("$title[/hello/world/]")
+	tokens, err := parser.parse()
+	assert.Nil(t, err)
+	assert.NotNil(t, tokens)
+	assert.Equal(t, 1, len(tokens))
+	assert.NotNil(t, tokens[0].Formatter)
+	assert.Equal(t, 1, len(tokens[0].Formatter))
+	assert.IsType(t, &ReplacingFormatter{}, tokens[0].Formatter[0])
+	formatter := tokens[0].Formatter[0].(*ReplacingFormatter)
+	assert.Equal(t, "hello", formatter.PatternString)
+	assert.Equal(t, "world", formatter.Value)
+
+	// regex
+	parser = newParser("$title[/[A-Z][a-z]+/world/]")
+	tokens, err = parser.parse()
+	assert.Nil(t, err)
+	assert.NotNil(t, tokens)
+	assert.Equal(t, 1, len(tokens))
+	assert.NotNil(t, tokens[0].Formatter)
+	assert.Equal(t, 1, len(tokens[0].Formatter))
+	assert.IsType(t, &ReplacingFormatter{}, tokens[0].Formatter[0])
+	formatter = tokens[0].Formatter[0].(*ReplacingFormatter)
+	assert.Equal(t, "[A-Z][a-z]+", formatter.PatternString)
+	assert.Equal(t, "world", formatter.Value)
+}
+
+func TestEscapeReplacingFormatterParser(t *testing.T) {
+	// escape slash
+	parser := newParser("$title[/[A-Z][a-z\\/]+/world/]")
+	tokens, err := parser.parse()
+	assert.Nil(t, err)
+	assert.NotNil(t, tokens)
+	assert.Equal(t, 1, len(tokens))
+	assert.NotNil(t, tokens[0].Formatter)
+	assert.Equal(t, 1, len(tokens[0].Formatter))
+	assert.IsType(t, &ReplacingFormatter{}, tokens[0].Formatter[0])
+	formatter := tokens[0].Formatter[0].(*ReplacingFormatter)
+	assert.Equal(t, "[A-Z][a-z\\/]+", formatter.PatternString)
+	assert.Equal(t, "world", formatter.Value)
+}
+
 func TestUnknownFormatter(t *testing.T) {
 	parser := newParser("$cnt[+10]")
 	_, err := parser.parse()

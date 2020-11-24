@@ -80,6 +80,13 @@ the value "Home" would be reduced to "Hom"; using \fI$title[>2:4]\fP would resul
 would result in "ome". If the \fIstart\fP parameter is greater than the length of the value to trim the formatter
 returns an empty string. For example, applying \fI$title[>5:10]\fP to "Home" would return "". 
 
+.TP
+\fB/[find]/[replace]/ - replacing formatter\fP
+The replacing formatter makes it easy to replace portions of a string. The \fIfind\fP parameter can be a literal
+string or a regular expression - including capturing groups - that raf will use to search for content in a property's
+value. The \fIreplace\fP string is the value that raf will replace for the matched portions of the value. For example,
+the property \fI$title[/\\./ /]\fP on the test "my.home.video" would return "my home video".
+
 .SH BUGS
 Report bugs on the GitHub repository at https://github.com/sapessi/raf
 

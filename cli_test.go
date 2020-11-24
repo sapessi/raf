@@ -131,6 +131,24 @@ func TestTitleWithSliceFormatter(t *testing.T) {
 	assert.Equal(t, "test - 5 - Par.avi", files[4])
 }
 
+func TestTitleWithReplacingFormatter(t *testing.T) {
+	testCtx, err := createIntegTestContext(t)
+	assert.Nil(t, err)
+
+	err = testCtx.CreateFiles("[UnionVideos] Wedding - $cnt - $title.mkv", "my.home.video")
+	assert.Nil(t, err)
+
+	app := getApp()
+	args := []string{"raf", "--prop", "title=\\d\\ \\-\\ ([A-Za-z0-9\\.]+)\\.mkv", "--output", "test - $cnt - $title[/\\./ /].avi"}
+	args = append(args, testCtx.Files(true)...)
+	err = app.Run(args)
+	assert.Nil(t, err)
+	files, err := testCtx.ListFilesInWorkingDir(false, false)
+	assert.Nil(t, err)
+	assert.Equal(t, 1, len(files))
+	assert.Equal(t, "test - 1 - my home video.avi", files[0])
+}
+
 func TestPartialRenameLog(t *testing.T) {
 	testCtx, err := createIntegTestContext(t)
 	assert.Nil(t, err)
