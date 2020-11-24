@@ -70,6 +70,16 @@ The padding formatter makes it eaasy to create strings of a fixed \fIlength\fP l
 example, this expression zero-pads the numeric counter variable to 3 characters in length: \fI$cnt[%03]\fP and will
 results in the following output for the first file: \fI001\fP. 
 
+.TP
+\fB>[start]:[end] - slice formatter\fP
+The slice formatter makes it easy to trim strings. The \fIstart\fP parameter is an integer indicating the first 
+character that should be considered and the \fIend\fP parameter is an integer indicating the maximum length of the
+string. Either parameter can be elided in which case \fIstart\fP will default to 0 and \fIend\fP will default to
+the length of the string itself. For example, \fI$title[>:3]\fP would trim a string to a maximum of 10 characters and
+the value "Home" would be reduced to "Hom"; using \fI$title[>2:4]\fP would result in "me"; and using \fI$title[>1:]\fP
+would result in "ome". If the \fIstart\fP parameter is greater than the length of the value to trim the formatter
+returns an empty string. For example, applying \fI$title[>5:10]\fP to "Home" would return "". 
+
 .SH BUGS
 Report bugs on the GitHub repository at https://github.com/sapessi/raf
 
