@@ -98,6 +98,13 @@ func (p *statefulParser) peek() rune {
 	return rune(p.str[p.idx])
 }
 
+func (p *statefulParser) cur() rune {
+	if p.idx == 0 {
+		return ' '
+	}
+	return rune(p.str[p.idx-1])
+}
+
 func (p *statefulParser) isLast() bool {
 	return p.idx >= p.len
 }
@@ -142,20 +149,22 @@ func (p *statefulParser) parseFormatters() (FormattingPipeline, error) {
 	// switch by formatter type
 	for !p.isLast() && p.peek() != ']' {
 		chr := p.peek()
-		var padder Formatter
+		var formatter Formatter
 		var err error
 		switch chr {
 		case '%': // padding
-			padder, err = p.parsePaddingFormatter()
+			formatter, err = p.parsePaddingFormatter()
 		case '>': //slice
-			padder, err = p.parseSliceFormatter()
+			formatter, err = p.parseSliceFormatter()
+		case '/': // replacing
+			formatter, err = p.parseReplacingFormatter()
 		default:
 			return nil, fmt.Errorf("Unknown formatter type %s", string(chr))
 		}
 		if err != nil {
 			return nil, err
 		}
-		formatters = append(formatters, padder)
+		formatters = append(formatters, formatter)
 	}
 
 	return formatters, nil
@@ -216,6 +225,33 @@ func (p *statefulParser) parseSliceFormatter() (*SliceFormatter, error) {
 	}
 	slicer := NewSliceFormatter(startPos, endPos)
 	return &slicer, nil
+}
+
+func (p *statefulParser) parseReplacingFormatter() (*ReplacingFormatter, error) {
+	p.nextChr() // skip the /
+
+	find := ""
+	for !p.isLast() {
+		if p.peek() == '/' && p.cur() != '\\' {
+			break
+		}
+		find += string(p.nextChr())
+	}
+
+	p.nextChr() // skip the /
+
+	replace := ""
+	for !p.isLast() {
+		if p.peek() == '/' && p.cur() != '\\' {
+			break
+		}
+		replace += string(p.nextChr())
+	}
+
+	p.nextChr() // skip the final /
+
+	formatter, err := NewReplacingFormatter(find, replace)
+	return &formatter, err
 }
 
 func (p *statefulParser) parseLiteral() (Token, error) {
