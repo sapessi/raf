@@ -142,36 +142,80 @@ func (p *statefulParser) parseFormatters() (FormattingPipeline, error) {
 	// switch by formatter type
 	for !p.isLast() && p.peek() != ']' {
 		chr := p.peek()
+		var padder Formatter
+		var err error
 		switch chr {
 		case '%': // padding
-			padder, err := p.parsePaddingFormatter()
-			if err != nil {
-				return nil, err
-			}
-			formatters = append(formatters, &padder)
+			padder, err = p.parsePaddingFormatter()
+		case '>': //slice
+			padder, err = p.parseSliceFormatter()
 		default:
 			return nil, fmt.Errorf("Unknown formatter type %s", string(chr))
 		}
+		if err != nil {
+			return nil, err
+		}
+		formatters = append(formatters, padder)
 	}
 
 	return formatters, nil
 }
 
-func (p *statefulParser) parsePaddingFormatter() (PaddingFormatter, error) {
+func (p *statefulParser) parsePaddingFormatter() (*PaddingFormatter, error) {
 	// at this point we should be peeking at the %
 	p.nextChr() // %
 
 	padChar := p.nextChr()
 
 	padLength := ""
-	for !p.isLast() && (p.peek() != ']' && p.peek() != '-') {
+	for !p.isLast() && (p.peek() != ']' && p.peek() != ',') {
 		padLength += string(p.nextChr())
 	}
 	padLengthInt, err := strconv.Atoi(padLength)
 	if err != nil {
-		return PaddingFormatter{}, err
+		return &PaddingFormatter{}, err
 	}
-	return NewPaddingFormatter(padChar, padLengthInt), nil
+	padder := NewPaddingFormatter(padChar, padLengthInt)
+	return &padder, nil
+}
+
+func (p *statefulParser) parseSliceFormatter() (*SliceFormatter, error) {
+	p.nextChr() // skip the >
+
+	startPos := -1
+	startPosStr := ""
+	for !p.isLast() && p.peek() != ':' {
+		if !unicode.IsDigit(p.peek()) {
+			return &SliceFormatter{}, fmt.Errorf("Found %s in beginning position of slice formatter, only numeric values are allowed", string(p.peek()))
+		}
+		startPosStr += string(p.nextChr())
+	}
+	if startPosStr != "" {
+		startPosTmp, err := strconv.Atoi(startPosStr)
+		if err != nil {
+			return &SliceFormatter{}, err
+		}
+		startPos = startPosTmp
+	}
+
+	p.nextChr() // skip the :
+	endPos := -1
+	endPosStr := ""
+	for !p.isLast() && (p.peek() != ']' && p.peek() != ',') {
+		if !unicode.IsDigit(p.peek()) {
+			return &SliceFormatter{}, fmt.Errorf("Found %s in end position of slice formatter, only numeric values are allowed", string(p.peek()))
+		}
+		endPosStr += string(p.nextChr())
+	}
+	if endPosStr != "" {
+		endPosTmp, err := strconv.Atoi(endPosStr)
+		if err != nil {
+			return &SliceFormatter{}, err
+		}
+		endPos = endPosTmp
+	}
+	slicer := NewSliceFormatter(startPos, endPos)
+	return &slicer, nil
 }
 
 func (p *statefulParser) parseLiteral() (Token, error) {
