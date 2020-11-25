@@ -3,9 +3,14 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
+	"os/exec"
+	"os/user"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/fatih/color"
@@ -13,6 +18,7 @@ import (
 )
 
 const rafStatusFile = ".raf"
+const rafVersion = "v0.3.0"
 
 // TODO: this is an ugly hack for the unit tests. We should formalize this
 // as a parameter
@@ -50,7 +56,7 @@ func getApp() *cli.App {
 		Name:        "raf",
 		Usage:       "raf -p \"title=Video\\ \\d+\\ \\-\\ ([A-Za-z0-9\\ ]+)_\" -d -o 'UnionStudio - $cnt - $title.mkv' *",
 		Description: cliDescription,
-		Version:     "v0.3.0",
+		Version:     rafVersion,
 		Flags: []cli.Flag{
 			&cli.StringSliceFlag{
 				Name:    "prop",
@@ -80,6 +86,11 @@ func getApp() *cli.App {
 				Name:   "undo",
 				Usage:  undoCommandDescription,
 				Action: undo,
+			},
+			{
+				Name:   "man",
+				Usage:  "Show man page for raf",
+				Action: man,
 			},
 		},
 	}
@@ -163,6 +174,62 @@ func rename(c *cli.Context) error {
 
 		}
 	}
+	return nil
+}
+
+func man(c *cli.Context) error {
+	manUri := "https://raw.githubusercontent.com/sapessi/raf/" + rafVersion + "/raf.1"
+	manWebMessage := fmt.Sprintf("The latest version of the documentation is available in the man page at %s", manUri)
+	_, manErr := exec.LookPath("man")
+	usr, userErr := user.Current()
+	if runtime.GOOS == "windows" || manErr != nil || userErr != nil {
+		fmt.Println(manWebMessage)
+		return nil
+	}
+
+	// crete folder for raf man page
+	rafHomeDir := usr.HomeDir + string(os.PathSeparator) + ".raf"
+	rafManPath := rafHomeDir + string(os.PathSeparator) + "raf.1"
+	if _, err := os.Stat(rafManPath); os.IsNotExist(err) {
+		if os.Mkdir(rafHomeDir, 0700) != nil {
+			fmt.Println(manWebMessage)
+			return err
+		}
+		// download man page from url
+		// Get the data
+		resp, err := http.Get(manUri)
+		if err != nil {
+			fmt.Println(manWebMessage)
+			return err
+		}
+
+		// Create the file
+		out, err := os.Create(rafManPath)
+		if err != nil {
+			fmt.Println(manWebMessage)
+			return err
+		}
+
+		// Write the body to file
+		_, err = io.Copy(out, resp.Body)
+		if err != nil {
+			fmt.Println(manWebMessage)
+			return err
+		}
+		resp.Body.Close()
+		out.Close()
+	}
+
+	cmd := exec.Command("man", rafManPath)
+	cmd.Stdout = os.Stdout
+	cmd.Stdin = os.Stdin
+	cmd.Stderr = os.Stderr
+	err := cmd.Run()
+	if err != nil {
+		fmt.Println(manWebMessage)
+		return err
+	}
+
 	return nil
 }
 
