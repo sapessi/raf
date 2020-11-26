@@ -189,12 +189,15 @@ func man(c *cli.Context) error {
 
 	// crete folder for raf man page
 	rafHomeDir := usr.HomeDir + string(os.PathSeparator) + ".raf"
-	rafManPath := rafHomeDir + string(os.PathSeparator) + "raf.1"
+	rafManPath := rafHomeDir + string(os.PathSeparator) + rafVersion + "_raf.1"
 	if _, err := os.Stat(rafManPath); os.IsNotExist(err) {
-		if os.Mkdir(rafHomeDir, 0700) != nil {
-			fmt.Println(manWebMessage)
-			return err
+		if _, pathErr := os.Stat(rafHomeDir); os.IsNotExist(pathErr) {
+			if os.Mkdir(rafHomeDir, 0700) != nil {
+				fmt.Println(manWebMessage)
+				return err
+			}
 		}
+
 		// download man page from url
 		// Get the data
 		resp, err := http.Get(manUri)
