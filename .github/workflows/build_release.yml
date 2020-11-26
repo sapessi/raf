@@ -30,7 +30,7 @@ jobs:
         EXTRA_FILES: "LICENSE raf.1"
         PROJECT_NAME: raf
   release-linux-arm:
-    name: release linux/386
+    name: release linux/arm
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@master
