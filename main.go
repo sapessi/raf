@@ -18,7 +18,7 @@ import (
 )
 
 const rafStatusFile = ".raf"
-const rafVersion = "v0.3.0"
+const rafVersion = "v0.3.1"
 
 // TODO: this is an ugly hack for the unit tests. We should formalize this
 // as a parameter
