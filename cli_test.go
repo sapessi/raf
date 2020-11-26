@@ -3,7 +3,9 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -44,6 +46,51 @@ func TestSimple(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, 5, len(files))
 	assert.Equal(t, "test - 2 - Chapel.avi", files[1])
+}
+
+func TestNameStdout(t *testing.T) {
+	testCtx, err := createIntegTestContext(t)
+	assert.Nil(t, err)
+
+	err = testCtx.CreateFiles("[UnionVideos] Wedding - $cnt - $title.mkv", "Home", "Chapel", "Church", "Reception", "Party")
+	assert.Nil(t, err)
+
+	app := getApp()
+	args := []string{"raf", "--prop", "title=\\d\\ \\-\\ ([A-Za-z0-9]+)\\.mkv", "--output", "test - $cnt - $title.avi"}
+	args = append(args, testCtx.Files(true)...)
+
+	// capture stdout
+	old := os.Stdout // keep backup of the real stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+	err = app.Run(args)
+	assert.Nil(t, err)
+
+	outC := make(chan string)
+	// copy the output in a separate goroutine so printing can't block indefinitely
+	go func() {
+		var buf bytes.Buffer
+		io.Copy(&buf, r)
+		outC <- buf.String()
+	}()
+	// back to normal state
+	w.Close()
+	os.Stdout = old // restoring the real stdout
+	out := <-outC
+
+	files, err := testCtx.ListFilesInWorkingDir(false, false)
+	assert.Nil(t, err)
+	assert.Equal(t, 5, len(files))
+	assert.Equal(t, "test - 2 - Chapel.avi", files[1])
+
+	outFiles := strings.Split(out, "\n")
+	assert.Equal(t, 6, len(outFiles))
+	assert.Equal(t, "test - 1 - Home.avi", outFiles[0])
+	assert.Equal(t, "test - 2 - Chapel.avi", outFiles[1])
+	assert.Equal(t, "test - 3 - Church.avi", outFiles[2])
+	assert.Equal(t, "test - 4 - Reception.avi", outFiles[3])
+	assert.Equal(t, "test - 5 - Party.avi", outFiles[4])
+	assert.Equal(t, "", outFiles[5])
 }
 
 func TestUndo(t *testing.T) {
