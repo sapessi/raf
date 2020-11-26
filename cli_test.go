@@ -186,6 +186,25 @@ func TestPartialRenameLog(t *testing.T) {
 	assert.Equal(t, 2, len(log))
 }
 
+func TestManDownload(t *testing.T) {
+	testCtx, err := createIntegTestContext(t)
+	assert.Nil(t, err)
+
+	rafUri := "https://raw.githubusercontent.com/sapessi/raf/v-1/raf.1"
+	manFile, err := getManPage(rafUri, testCtx.filesDir, "-1")
+	assert.NotNil(t, err)
+	assert.Errorf(t, err, "Could not retrieve raf man page from repository (%s): %s", rafUri, "404 Not Found")
+	assert.Equal(t, "", manFile)
+
+	rafUri = "https://raw.githubusercontent.com/sapessi/raf/v0.3.0/raf.1"
+	rafHome := testCtx.filesDir + string(os.PathSeparator) + ".raf" // make sure we can create the dir
+	manPath := rafHome + string(os.PathSeparator) + "v0.3.0_raf.1"
+	manFile, err = getManPage(rafUri, rafHome, "v0.3.0")
+	assert.Nil(t, err)
+	assert.Equal(t, manPath, manFile)
+	assert.FileExists(t, manPath)
+}
+
 type integTestContext struct {
 	filesDir string
 	files    []string
