@@ -283,6 +283,7 @@ func Apply(rlog RenameLog, path string, opts Opts) error {
 			}
 			return err
 		}
+		fmt.Println(e.NewFileName)
 	}
 
 	// write new log file
