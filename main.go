@@ -187,57 +187,61 @@ func man(c *cli.Context) error {
 		return nil
 	}
 
-	// crete folder for raf man page
-	rafHomeDir := usr.HomeDir + string(os.PathSeparator) + ".raf"
-	rafManPath := rafHomeDir + string(os.PathSeparator) + rafVersion + "_raf.1"
-	if _, err := os.Stat(rafManPath); os.IsNotExist(err) {
-		if _, pathErr := os.Stat(rafHomeDir); os.IsNotExist(pathErr) {
-			if os.Mkdir(rafHomeDir, 0700) != nil {
-				fmt.Println(manWebMessage)
-				return err
-			}
-		}
-
-		// download man page from url
-		// Get the data
-		resp, err := http.Get(manUri)
-		if err != nil {
-			fmt.Println(manWebMessage)
-			return err
-		}
-		if resp.StatusCode != http.StatusOK {
-			fmt.Println(manWebMessage)
-			return fmt.Errorf("Could not retrieve raf man page from repository (%s): %s", manUri, resp.Status)
-		}
-
-		// Create the file
-		out, err := os.Create(rafManPath)
-		if err != nil {
-			fmt.Println(manWebMessage)
-			return err
-		}
-
-		// Write the body to file
-		_, err = io.Copy(out, resp.Body)
-		if err != nil {
-			fmt.Println(manWebMessage)
-			return err
-		}
-		resp.Body.Close()
-		out.Close()
+	rafHome := usr.HomeDir + string(os.PathSeparator) + ".raf"
+	rafManPath, err := getManPage(manUri, rafHome, rafVersion)
+	if err != nil {
+		fmt.Println(manWebMessage)
+		return err
 	}
 
 	cmd := exec.Command("man", rafManPath)
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
-	err := cmd.Run()
+	err = cmd.Run()
 	if err != nil {
 		fmt.Println(manWebMessage)
 		return err
 	}
 
 	return nil
+}
+
+func getManPage(rafUri, rafHome, version string) (string, error) {
+	// crete folder for raf man page
+	rafManPath := rafHome + string(os.PathSeparator) + version + "_raf.1"
+	if _, err := os.Stat(rafManPath); os.IsNotExist(err) {
+		if _, pathErr := os.Stat(rafHome); os.IsNotExist(pathErr) {
+			if os.Mkdir(rafHome, 0700) != nil {
+				return "", err
+			}
+		}
+
+		// download man page from url
+		// Get the data
+		resp, err := http.Get(rafUri)
+		if err != nil {
+			return "", err
+		}
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("Could not retrieve raf man page from repository (%s): %s", rafUri, resp.Status)
+		}
+
+		// Create the file
+		out, err := os.Create(rafManPath)
+		if err != nil {
+			return "", err
+		}
+
+		// Write the body to file
+		_, err = io.Copy(out, resp.Body)
+		if err != nil {
+			return "", err
+		}
+		resp.Body.Close()
+		out.Close()
+	}
+	return rafManPath, nil
 }
 
 func readOpts(c *cli.Context) Opts {
