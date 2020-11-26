@@ -205,6 +205,10 @@ func man(c *cli.Context) error {
 			fmt.Println(manWebMessage)
 			return err
 		}
+		if resp.StatusCode != http.StatusOK {
+			fmt.Println(manWebMessage)
+			return fmt.Errorf("Could not retrieve raf man page from repository (%s): %s", manUri, resp.Status)
+		}
 
 		// Create the file
 		out, err := os.Create(rafManPath)
