@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -255,6 +256,25 @@ func validateMatcher(c *cli.Context) ([]string, error) {
 	files := c.Args().Slice()
 	if files == nil || len(files) == 0 {
 		return nil, errors.New("No input files")
+	}
+	// special support of * wildcard in windows
+	if len(files) == 1 && files[0] == "*" && runtime.GOOS == "windows" {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return nil, errors.New("Could not determine current working directory")
+		}
+		allFiles, err := ioutil.ReadDir(cwd)
+		if err != nil {
+			return nil, errors.New("Could not list current directory contents")
+		}
+		files = make([]string, 0)
+		for _, f := range allFiles {
+			if f.IsDir() {
+				continue
+			}
+			files = append(files, filepath.Join(cwd, f.Name()))
+		}
+
 	}
 
 	return files, nil
