@@ -4,6 +4,10 @@
 
 ![](media/raf.gif)
 
+For example, you could use `raf` to rename GoPro video files so that they sort correctly when listed alphabetically:
+```bash
+$ raf -d -p 'chap=G[PHXL](\d{2})' -p 'seq=G[PHXL]\d{2}(\d{4})' -o 'GoPro_$seq_$chap$ext' *
+```
 
 ## Options:
 * `--prop -p`: Specifies a regular expression to select a part of the file name and saves its value in the variable name. `<name>=<regex>`
@@ -30,4 +34,3 @@ The padding formatter is triggered with the `%` character and receives two param
 
 ## TODO
 - [ ] tests tests tests
-- [ ] Output formatting, for example $cnt[%03d] to obtain `001`
